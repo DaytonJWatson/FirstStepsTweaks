@@ -412,5 +412,72 @@ namespace FirstStepsTweaks.Services
             api.Logger.Warning($"[GRAVE BACKUP] Restored emergency backup for {player.PlayerUID} ({reason})");
             return true;
         }
+
+        public List<BlockPos> GetActiveGraves()
+        {
+            List<BlockPos> graves = new List<BlockPos>();
+
+            foreach (var pos in activeGraves)
+            {
+                graves.Add(pos.Copy());
+            }
+
+            return graves;
+        }
+
+        public bool TryRemoveGrave(BlockPos pos)
+        {
+            if (pos == null) return false;
+
+            string key = $"deathbones-{pos.X}-{pos.Y}-{pos.Z}";
+            byte[] raw = api.WorldManager.SaveGame.GetData(key);
+
+            if (raw == null || raw.Length == 0)
+            {
+                return false;
+            }
+
+            api.WorldManager.SaveGame.StoreData(key, new byte[0]);
+            activeGraves.RemoveWhere(p => p.Equals(pos));
+
+            Block current = api.World.BlockAccessor.GetBlock(pos);
+            if (current != null && current.Code != null && current.Code.Path == "figurehead-skull")
+            {
+                api.World.BlockAccessor.SetBlock(0, pos);
+            }
+
+            return true;
+        }
+
+        public bool TryDuplicateGraveItems(BlockPos pos, IServerPlayer target)
+        {
+            if (pos == null || target == null) return false;
+
+            List<ItemStack> stacks = LoadStacksAtPos(pos);
+            if (stacks == null || stacks.Count == 0) return false;
+
+            GiveItemsBack(target, stacks);
+            return true;
+        }
+
+        public bool TryGiveGraveItems(BlockPos pos, IServerPlayer target)
+        {
+            if (pos == null || target == null) return false;
+
+            List<ItemStack> stacks = LoadStacksAtPos(pos);
+            if (stacks == null || stacks.Count == 0) return false;
+
+            GiveItemsBack(target, stacks);
+            return TryRemoveGrave(pos);
+        }
+
+        private List<ItemStack> LoadStacksAtPos(BlockPos pos)
+        {
+            string key = $"deathbones-{pos.X}-{pos.Y}-{pos.Z}";
+            byte[] raw = api.WorldManager.SaveGame.GetData(key);
+            if (raw == null || raw.Length == 0) return null;
+
+            return LoadStacksFromRaw(raw);
+        }
     }
 }
