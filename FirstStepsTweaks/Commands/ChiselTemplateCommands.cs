@@ -182,7 +182,9 @@ namespace FirstStepsTweaks.Commands
 
         private static Block ResolveTemplateBlock(ICoreServerAPI api, string templateBlockCode)
         {
-            foreach (string candidateCode in BuildTemplateBlockCandidates(templateBlockCode))
+            string normalizedTemplateCode = NormalizeTemplateBlockCode(templateBlockCode);
+
+            foreach (string candidateCode in BuildTemplateBlockCandidates(normalizedTemplateCode))
             {
                 Block candidateBlock = api.World.GetBlock(new AssetLocation(candidateCode));
                 if (IsUsableBlock(candidateBlock))
@@ -209,6 +211,18 @@ namespace FirstStepsTweaks.Commands
 
             yield return "game:chiseledblock-stonegranite";
             yield return "game:chiseledblock";
+        }
+
+        private static string NormalizeTemplateBlockCode(string templateBlockCode)
+        {
+            if (string.IsNullOrWhiteSpace(templateBlockCode))
+            {
+                return string.Empty;
+            }
+
+            return templateBlockCode
+                .Trim()
+                .Replace("chisledblock", "chiseledblock", StringComparison.OrdinalIgnoreCase);
         }
 
         private static Block FindFallbackChiseledBlock(ICoreServerAPI api)
