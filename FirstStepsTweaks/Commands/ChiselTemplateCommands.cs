@@ -76,19 +76,14 @@ namespace FirstStepsTweaks.Commands
                 TreeAttribute stateTree = new TreeAttribute();
                 blockEntity.ToTreeAttributes(stateTree);
 
-                JToken serialized = new JObject
-                {
-                    ["blockCode"] = block.Code?.ToShortString() ?? string.Empty,
-                    ["state"] = stateTree.ToJsonToken() ?? new JObject()
-                };
-
-                string json = serialized.ToString();
+                string blockCode = block.Code?.ToShortString() ?? "game:chiseledblock";
+                string encodedState = EncodeTreeAttribute(stateTree);
 
                 string templatesDir = api.GetOrCreateDataPath("ChiselTemplates");
                 Directory.CreateDirectory(templatesDir);
 
-                string filePath = Path.Combine(templatesDir, sanitizedName + ".json");
-                File.WriteAllText(filePath, json, Encoding.UTF8);
+                string filePath = Path.Combine(templatesDir, sanitizedName + ".template");
+                File.WriteAllLines(filePath, new[] { blockCode, encodedState }, Encoding.UTF8);
 
                 string successMessage = $"Captured chiseled template '{sanitizedName}' from {pos.X} {pos.Y} {pos.Z}.";
                 caller.SendMessage(GlobalConstants.InfoLogChatGroup, successMessage, EnumChatType.CommandSuccess);
@@ -118,7 +113,12 @@ namespace FirstStepsTweaks.Commands
             }
 
             string templatesDir = api.GetOrCreateDataPath("ChiselTemplates");
-            string filePath = Path.Combine(templatesDir, sanitizedName + ".json");
+            string filePath = Path.Combine(templatesDir, sanitizedName + ".template");
+
+            if (!File.Exists(filePath))
+            {
+                filePath = Path.Combine(templatesDir, sanitizedName + ".json");
+            }
 
             if (!File.Exists(filePath))
             {
@@ -128,11 +128,14 @@ namespace FirstStepsTweaks.Commands
 
             try
             {
-                string rawJson = File.ReadAllText(filePath, Encoding.UTF8);
-                JToken rootToken = JToken.Parse(rawJson);
+                string[] lines = File.ReadAllLines(filePath, Encoding.UTF8);
+                if (lines.Length < 2)
+                {
+                    caller.SendMessage(GlobalConstants.InfoLogChatGroup, "Template format is invalid.", EnumChatType.CommandError);
+                    return TextCommandResult.Success();
+                }
 
-                JToken stateToken = rootToken["state"] ?? rootToken;
-                string blockCode = rootToken["blockCode"]?.Value<string>();
+                string blockCode = lines[0];
                 if (string.IsNullOrWhiteSpace(blockCode))
                 {
                     blockCode = "game:chiseledblock";
@@ -155,8 +158,7 @@ namespace FirstStepsTweaks.Commands
                     return TextCommandResult.Success();
                 }
 
-                TreeAttribute stateTree = new TreeAttribute();
-                stateTree.FromJsonToken(stateToken);
+                TreeAttribute stateTree = DecodeTreeAttribute(lines[1]);
 
                 placedEntity.FromTreeAttributes(stateTree, api.World);
                 placedEntity.MarkDirty(true);
@@ -173,6 +175,31 @@ namespace FirstStepsTweaks.Commands
             }
 
             return TextCommandResult.Success();
+        }
+
+
+        private static string EncodeTreeAttribute(TreeAttribute stateTree)
+        {
+            using (MemoryStream memoryStream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(memoryStream, Encoding.UTF8, true))
+            {
+                stateTree.ToBytes(writer);
+                writer.Flush();
+                return Convert.ToBase64String(memoryStream.ToArray());
+            }
+        }
+
+        private static TreeAttribute DecodeTreeAttribute(string encodedState)
+        {
+            byte[] stateBytes = Convert.FromBase64String(encodedState);
+
+            using (MemoryStream memoryStream = new MemoryStream(stateBytes))
+            using (BinaryReader reader = new BinaryReader(memoryStream, Encoding.UTF8, true))
+            {
+                TreeAttribute stateTree = new TreeAttribute();
+                stateTree.FromBytes(reader);
+                return stateTree;
+            }
         }
 
         private static bool IsLikelyChiseled(Block block, BlockEntity blockEntity)
