@@ -37,6 +37,7 @@ namespace FirstStepsTweaks
             KitCommands.Register(api);
             TpaCommands.Register(api);
             UtilityCommands.Register(api);
+            CorpseAdminCommands.Register(api, corpseService);
         }
     }
 }
