@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "modid": "firststepstweaks",
+  "name": "First Steps Tweaks",
+  "version": "1.0.0",
+  "description": "First Steps server tweaks",
+  "authors": ["YourName"],
+  "side": "Server",
+  "dependencies": {
+    "game": "*"
+  }
+}
