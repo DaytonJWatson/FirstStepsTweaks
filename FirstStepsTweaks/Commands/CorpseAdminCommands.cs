@@ -67,8 +67,10 @@ namespace FirstStepsTweaks.Commands
             int max = graves.Count > 20 ? 20 : graves.Count;
             for (int i = 0; i < max; i++)
             {
-                BlockPos pos = graves[i];
-                sb.AppendLine($"- {pos.X} {pos.Y} {pos.Z}");
+                var grave = graves[i];
+                BlockPos pos = grave.Position;
+                string owner = string.IsNullOrEmpty(grave.OwnerName) ? grave.OwnerUid : grave.OwnerName;
+                sb.AppendLine($"- ID {grave.GraveId}: {owner} @ {pos.X} {pos.Y} {pos.Z}");
             }
 
             if (graves.Count > max)
