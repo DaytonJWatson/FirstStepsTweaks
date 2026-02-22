@@ -141,10 +141,10 @@ namespace FirstStepsTweaks.Commands
                     blockCode = "game:chiseledblock";
                 }
 
-                Block blockToPlace = api.World.GetBlock(new AssetLocation(blockCode));
+                Block blockToPlace = ResolveTemplateBlock(api, blockCode);
                 if (blockToPlace == null || blockToPlace.Id == 0)
                 {
-                    caller.SendMessage(GlobalConstants.InfoLogChatGroup, $"Unable to resolve block '{blockCode}' in template.", EnumChatType.CommandError);
+                    caller.SendMessage(GlobalConstants.InfoLogChatGroup, $"Unable to resolve a valid chiseled block for template '{sanitizedName}'.", EnumChatType.CommandError);
                     return TextCommandResult.Success();
                 }
 
@@ -177,6 +177,38 @@ namespace FirstStepsTweaks.Commands
             return TextCommandResult.Success();
         }
 
+
+
+        private static Block ResolveTemplateBlock(ICoreServerAPI api, string templateBlockCode)
+        {
+            if (!string.IsNullOrWhiteSpace(templateBlockCode))
+            {
+                Block templateBlock = api.World.GetBlock(new AssetLocation(templateBlockCode));
+                if (IsUsableBlock(templateBlock))
+                {
+                    return templateBlock;
+                }
+            }
+
+            Block fallback = api.World.GetBlock(new AssetLocation("game:chiseledblock"));
+            if (IsUsableBlock(fallback))
+            {
+                return fallback;
+            }
+
+            return null;
+        }
+
+        private static bool IsUsableBlock(Block block)
+        {
+            if (block == null || block.Id == 0)
+            {
+                return false;
+            }
+
+            string path = block.Code?.Path?.ToLowerInvariant() ?? string.Empty;
+            return path != "error" && !path.Contains("error");
+        }
 
         private static string EncodeTreeAttribute(TreeAttribute stateTree)
         {
