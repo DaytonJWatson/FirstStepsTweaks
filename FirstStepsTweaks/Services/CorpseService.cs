@@ -15,7 +15,24 @@ namespace FirstStepsTweaks.Services
         private readonly ICoreServerAPI api;
         private const string EmergencyBackupPrefix = "deathbones-emergency-";
         private readonly HashSet<BlockPos> suppressDropPositions = new HashSet<BlockPos>();
-        private readonly HashSet<BlockPos> activeGraves = new HashSet<BlockPos>();
+        public class GraveSummary
+        {
+            public int GraveId;
+            public string OwnerName;
+            public string OwnerUid;
+            public BlockPos Position;
+        }
+
+        private class GraveRecord
+        {
+            public int GraveId;
+            public string OwnerName;
+            public string OwnerUid;
+            public BlockPos Position;
+        }
+
+        private readonly Dictionary<string, GraveRecord> activeGravesByPos = new Dictionary<string, GraveRecord>();
+        private int nextGraveId = 1;
         private int graveBlockId;
 
         public CorpseService(ICoreServerAPI api)
@@ -57,11 +74,12 @@ namespace FirstStepsTweaks.Services
         }
         private void EnforceGravesPresent(float dt)
         {
-            if (activeGraves.Count == 0 || graveBlockId == 0) return;
+            if (activeGravesByPos.Count == 0 || graveBlockId == 0) return;
 
             // Re-place skull if data exists and the block is missing
-            foreach (var pos in activeGraves)
+            foreach (var record in activeGravesByPos.Values)
             {
+                BlockPos pos = record.Position;
                 // If the skull is gone, restore it
                 Block current = api.World.BlockAccessor.GetBlock(pos);
                 if (current == null || current.Code == null) continue;
@@ -187,7 +205,7 @@ namespace FirstStepsTweaks.Services
 
             mergedStacks.AddRange(stacks);
 
-            byte[] raw = SerializeGraveData(player, mergedStacks, pos);
+            byte[] raw = SerializeGraveData(player, mergedStacks, pos, GetOrCreateGraveId(pos));
             if (raw == null || raw.Length == 0) return false;
 
             api.WorldManager.SaveGame.StoreData(key, raw);
@@ -197,16 +215,18 @@ namespace FirstStepsTweaks.Services
                 return false;
             }
 
-            activeGraves.Add(pos.Copy());
+            TrackOrUpdateActiveGrave(pos, player.PlayerUID, player.PlayerName, ReadGraveId(raw, pos));
             api.Logger.Warning($"[GRAVE SAVE] Stored grave at {pos} with {mergedStacks.Count} stack(s)");
             return true;
         }
 
-        private byte[] SerializeGraveData(IPlayer player, List<ItemStack> stacks, BlockPos pos)
+        private byte[] SerializeGraveData(IPlayer player, List<ItemStack> stacks, BlockPos pos, int graveId = 0)
         {
             TreeAttribute tree = new TreeAttribute();
 
             tree.SetString("owner", player.PlayerUID);
+            tree.SetString("ownerName", player.PlayerName);
+            tree.SetInt("graveId", graveId > 0 ? graveId : GetOrCreateGraveId(pos));
             tree.SetInt("x", pos.X);
             tree.SetInt("y", pos.Y);
             tree.SetInt("z", pos.Z);
@@ -307,7 +327,7 @@ namespace FirstStepsTweaks.Services
                 suppressDropPositions.Add(pos.Copy());
 
                 // Keep tracking it as an active grave
-                activeGraves.Add(pos.Copy());
+                EnsureTrackedFromRaw(pos, raw);
                 return;
             }
 
@@ -328,7 +348,7 @@ namespace FirstStepsTweaks.Services
             api.WorldManager.SaveGame.StoreData(GetEmergencyBackupKey(byPlayer.PlayerUID), new byte[0]);
 
             // Stop tracking as an active grave
-            activeGraves.RemoveWhere(p => p.Equals(pos));
+            RemoveTrackedGrave(pos);
 
             // Also remove the skull drop for owner breaks
             suppressDropPositions.Add(pos.Copy());
@@ -411,6 +431,191 @@ namespace FirstStepsTweaks.Services
             );
             api.Logger.Warning($"[GRAVE BACKUP] Restored emergency backup for {player.PlayerUID} ({reason})");
             return true;
+        }
+
+        public List<GraveSummary> GetActiveGraves()
+        {
+            List<GraveSummary> graves = new List<GraveSummary>();
+
+            foreach (var record in activeGravesByPos.Values)
+            {
+                graves.Add(new GraveSummary
+                {
+                    GraveId = record.GraveId,
+                    OwnerName = record.OwnerName,
+                    OwnerUid = record.OwnerUid,
+                    Position = record.Position.Copy()
+                });
+            }
+
+            graves.Sort((a, b) => a.GraveId.CompareTo(b.GraveId));
+            return graves;
+        }
+
+
+        public bool TryRemoveGraveById(int graveId)
+        {
+            if (!TryGetPositionByGraveId(graveId, out BlockPos pos)) return false;
+            return TryRemoveGrave(pos);
+        }
+
+        public bool TryDuplicateGraveItemsById(int graveId, IServerPlayer target)
+        {
+            if (!TryGetPositionByGraveId(graveId, out BlockPos pos)) return false;
+            return TryDuplicateGraveItems(pos, target);
+        }
+
+        public bool TryGiveGraveItemsById(int graveId, IServerPlayer target)
+        {
+            if (!TryGetPositionByGraveId(graveId, out BlockPos pos)) return false;
+            return TryGiveGraveItems(pos, target);
+        }
+
+        public bool TryRemoveGrave(BlockPos pos)
+        {
+            if (pos == null) return false;
+
+            string key = $"deathbones-{pos.X}-{pos.Y}-{pos.Z}";
+            byte[] raw = api.WorldManager.SaveGame.GetData(key);
+
+            if (raw == null || raw.Length == 0)
+            {
+                return false;
+            }
+
+            api.WorldManager.SaveGame.StoreData(key, new byte[0]);
+            RemoveTrackedGrave(pos);
+
+            Block current = api.World.BlockAccessor.GetBlock(pos);
+            if (current != null && current.Code != null && current.Code.Path == "figurehead-skull")
+            {
+                api.World.BlockAccessor.SetBlock(0, pos);
+            }
+
+            return true;
+        }
+
+        public bool TryDuplicateGraveItems(BlockPos pos, IServerPlayer target)
+        {
+            if (pos == null || target == null) return false;
+
+            List<ItemStack> stacks = LoadStacksAtPos(pos);
+            if (stacks == null || stacks.Count == 0) return false;
+
+            GiveItemsBack(target, stacks);
+            return true;
+        }
+
+        public bool TryGiveGraveItems(BlockPos pos, IServerPlayer target)
+        {
+            if (pos == null || target == null) return false;
+
+            List<ItemStack> stacks = LoadStacksAtPos(pos);
+            if (stacks == null || stacks.Count == 0) return false;
+
+            GiveItemsBack(target, stacks);
+            return TryRemoveGrave(pos);
+        }
+
+        private List<ItemStack> LoadStacksAtPos(BlockPos pos)
+        {
+            string key = $"deathbones-{pos.X}-{pos.Y}-{pos.Z}";
+            byte[] raw = api.WorldManager.SaveGame.GetData(key);
+            if (raw == null || raw.Length == 0) return null;
+
+            return LoadStacksFromRaw(raw);
+        }
+
+        private int GetOrCreateGraveId(BlockPos pos)
+        {
+            string posKey = GetPositionKey(pos);
+            if (activeGravesByPos.TryGetValue(posKey, out GraveRecord existing))
+            {
+                return existing.GraveId;
+            }
+
+            int graveId = nextGraveId;
+            nextGraveId++;
+            return graveId;
+        }
+
+        private int ReadGraveId(byte[] raw, BlockPos pos)
+        {
+            TreeAttribute tree;
+            using (var ms = new MemoryStream(raw))
+            using (var reader = new BinaryReader(ms))
+            {
+                tree = new TreeAttribute();
+                tree.FromBytes(reader);
+            }
+
+            int graveId = tree.GetInt("graveId", 0);
+            return graveId > 0 ? graveId : GetOrCreateGraveId(pos);
+        }
+
+        private void TrackOrUpdateActiveGrave(BlockPos pos, string ownerUid, string ownerName, int graveId)
+        {
+            if (graveId >= nextGraveId)
+            {
+                nextGraveId = graveId + 1;
+            }
+
+            string posKey = GetPositionKey(pos);
+            activeGravesByPos[posKey] = new GraveRecord
+            {
+                GraveId = graveId,
+                OwnerUid = ownerUid,
+                OwnerName = string.IsNullOrEmpty(ownerName) ? ownerUid : ownerName,
+                Position = pos.Copy()
+            };
+        }
+
+        private void EnsureTrackedFromRaw(BlockPos pos, byte[] raw)
+        {
+            TreeAttribute tree;
+            using (var ms = new MemoryStream(raw))
+            using (var reader = new BinaryReader(ms))
+            {
+                tree = new TreeAttribute();
+                tree.FromBytes(reader);
+            }
+
+            string ownerUid = tree.GetString("owner");
+            string ownerName = tree.GetString("ownerName");
+            int graveId = tree.GetInt("graveId", 0);
+
+            if (graveId <= 0)
+            {
+                graveId = GetOrCreateGraveId(pos);
+            }
+
+            TrackOrUpdateActiveGrave(pos, ownerUid, ownerName, graveId);
+        }
+
+
+        private bool TryGetPositionByGraveId(int graveId, out BlockPos pos)
+        {
+            foreach (var record in activeGravesByPos.Values)
+            {
+                if (record.GraveId == graveId)
+                {
+                    pos = record.Position.Copy();
+                    return true;
+                }
+            }
+
+            pos = null;
+            return false;
+        }
+
+        private void RemoveTrackedGrave(BlockPos pos)
+        {
+            activeGravesByPos.Remove(GetPositionKey(pos));
+        }
+
+        private string GetPositionKey(BlockPos pos)
+        {
+            return $"{pos.X}:{pos.Y}:{pos.Z}";
         }
     }
 }
