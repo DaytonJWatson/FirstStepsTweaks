@@ -20,5 +20,9 @@ namespace FirstStepsTweaks.Discord
         public bool IgnoreEmptyDiscordMessages { get; set; } = true;
         public List<string> IgnoreDiscordPrefixes { get; set; } = new List<string> { "!" }; // ignore bot commands
         public List<string> IgnoreGamePrefixes { get; set; } = new List<string> { "/" };    // ignore commands typed in-game
+
+        // Optional mention mapping for game -> Discord relay.
+        // Example: { "alice": "123456789012345678" } allows typing "@alice" in-game to ping that Discord user.
+        public Dictionary<string, string> GameMentionMap { get; set; } = new Dictionary<string, string>();
     }
 }
