@@ -25,6 +25,7 @@ namespace FirstStepsTweaks
 
             // Events
             api.Event.OnEntityDeath += corpseService.OnEntityDeath;
+            api.Event.OnEntityDeath += BackCommands.OnEntityDeath;
             api.Event.DidBreakBlock += corpseService.OnBlockBroken;
             api.Event.PlayerJoin += joinService.OnPlayerJoin;
             api.Event.PlayerChat += discord.OnPlayerChat;
@@ -33,6 +34,7 @@ namespace FirstStepsTweaks
             DebugCommands.Register(api);
             DiscordCommands.Register(api);
             SpawnCommands.Register(api);
+            BackCommands.Register(api);
             HomeCommands.Register(api);
             KitCommands.Register(api);
             TpaCommands.Register(api);
