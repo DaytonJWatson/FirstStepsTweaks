@@ -145,6 +145,10 @@ namespace FirstStepsTweaks.Commands
                 $"{caller.PlayerName} wants to teleport to you. Use /tpaccept to accept.",
                 EnumChatType.Notification);
 
+            target.SendMessage(GlobalConstants.GeneralChatGroup,
+                $"You recieved a teleport request from {caller.PlayerName}.",
+                EnumChatType.Notification);
+
             return TextCommandResult.Success();
         }
 
