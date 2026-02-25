@@ -642,16 +642,36 @@ namespace FirstStepsTweaks.Services
             var blockEntity = api.World.BlockAccessor.GetBlockEntity(pos);
             if (blockEntity == null) return;
 
-            PropertyInfo attributesProperty =
-                blockEntity.GetType().GetProperty("Attributes") ??
-                blockEntity.GetType().GetProperty("TreeAttributes") ??
-                blockEntity.GetType().GetProperty("WatchedAttributes");
+            Type beType = blockEntity.GetType();
 
-            if (attributesProperty?.GetValue(blockEntity) is ITreeAttribute tree)
+            PropertyInfo nameProperty = beType.GetProperty("Name");
+            if (nameProperty != null && nameProperty.CanWrite && nameProperty.PropertyType == typeof(string))
             {
-                tree.SetString("name", displayName);
-                blockEntity.MarkDirty(true);
+                nameProperty.SetValue(blockEntity, displayName);
             }
+
+            MethodInfo setNameMethod = beType.GetMethod("SetName", new[] { typeof(string) });
+            setNameMethod?.Invoke(blockEntity, new object[] { displayName });
+
+            PropertyInfo[] attributeProperties =
+            {
+                beType.GetProperty("Attributes"),
+                beType.GetProperty("TreeAttributes"),
+                beType.GetProperty("WatchedAttributes")
+            };
+
+            for (int i = 0; i < attributeProperties.Length; i++)
+            {
+                if (attributeProperties[i]?.GetValue(blockEntity) is ITreeAttribute tree)
+                {
+                    tree.SetString("name", displayName);
+                    tree.SetString("displayName", displayName);
+                    tree.SetString("label", displayName);
+                    tree.SetString("text", displayName);
+                }
+            }
+
+            blockEntity.MarkDirty(true);
         }
 
         private void PlaceGraveBlock(BlockPos pos, string ownerName, int blockId = 0)
