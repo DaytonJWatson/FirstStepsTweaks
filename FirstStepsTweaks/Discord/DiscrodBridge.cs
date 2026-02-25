@@ -117,16 +117,51 @@ namespace FirstStepsTweaks.Discord
         {
             if (!IsConfigured()) return;
 
+            string mappedMessage = ReplaceGameMentionsWithDiscordMentions(message);
+
             var payload = new
             {
                 username = username,
-                content = message
+                content = mappedMessage,
+                allowed_mentions = new
+                {
+                    parse = new[] { "users" }
+                }
             };
 
             string json = JsonSerializer.Serialize(payload);
 
             using var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
             await http.PostAsync(config.WebhookUrl, httpContent);
+        }
+
+
+        private string ReplaceGameMentionsWithDiscordMentions(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return message;
+            if (config?.GameMentionMap == null || config.GameMentionMap.Count == 0) return message;
+
+            return Regex.Replace(
+                message,
+                @"(?<!\w)@([A-Za-z0-9_.-]+)",
+                match =>
+                {
+                    string key = match.Groups[1].Value;
+
+                    if (!config.GameMentionMap.TryGetValue(key, out string discordId) &&
+                        !config.GameMentionMap.TryGetValue(key.ToLowerInvariant(), out discordId))
+                    {
+                        return match.Value;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(discordId))
+                    {
+                        return match.Value;
+                    }
+
+                    return $"<@{discordId.Trim()}>";
+                }
+            );
         }
 
         private async Task SendEmbedToDiscord(string username, string description, int color)
