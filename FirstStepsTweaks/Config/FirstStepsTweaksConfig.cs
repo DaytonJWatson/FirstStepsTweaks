@@ -101,6 +101,7 @@ namespace FirstStepsTweaks.Config
         public string GraveBlockCode { get; set; } = "game:figurehead-skull";
         public int DropCleanupTickMs { get; set; } = 50;
         public int EnforceGraveTickMs { get; set; } = 200;
+        public long GraveExpireMs { get; set; } = 3600000;
     }
 
     public class LandClaimNotificationConfig
