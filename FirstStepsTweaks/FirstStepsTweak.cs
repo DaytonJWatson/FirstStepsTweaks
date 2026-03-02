@@ -25,7 +25,7 @@ namespace FirstStepsTweaks
             {
                 corpseService = new CorpseService(api, config);
                 api.Event.OnEntityDeath += corpseService.OnEntityDeath;
-                api.Event.OnTryBlockBreak += corpseService.OnTryBlockBreak;
+                api.Event.DidBreakBlock += corpseService.OnBlockBroken;
             }
 
             if (config.Features.EnableBackCommand)
