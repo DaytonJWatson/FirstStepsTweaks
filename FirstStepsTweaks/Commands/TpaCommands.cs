@@ -224,10 +224,7 @@ namespace FirstStepsTweaks.Commands
 
                 if (seconds > 0)
                 {
-                    requester.SendMessage(GlobalConstants.InfoLogChatGroup,
-                        $"Teleporting in {seconds}...",
-                        EnumChatType.Notification);
-
+                    requester.SendIngameError("no_permission", $"Teleporting in {seconds}...");
                     seconds--;
                 }
                 else
@@ -239,9 +236,7 @@ namespace FirstStepsTweaks.Commands
                         target.Entity.Pos.Z
                     );
 
-                    requester.SendMessage(GlobalConstants.InfoLogChatGroup,
-                        "Teleported.",
-                        EnumChatType.CommandSuccess);
+                    requester.SendIngameError("no_permission", "Teleported.");
 
                     api.Event.UnregisterGameTickListener(listenerId);
                 }

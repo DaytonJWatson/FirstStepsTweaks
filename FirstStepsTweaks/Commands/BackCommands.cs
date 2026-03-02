@@ -75,6 +75,11 @@ namespace FirstStepsTweaks.Commands
             int secondsRemaining = teleportConfig.WarmupSeconds;
             long listenerId = 0;
 
+            player.SendMessage(
+                GlobalConstants.InfoLogChatGroup,
+                $"Teleporting to your previous location in {teleportConfig.WarmupSeconds} seconds. Do not move.",
+                EnumChatType.CommandSuccess);
+
             listenerId = api.Event.RegisterGameTickListener((dt) =>
             {
                 if (player?.Entity == null)
@@ -101,12 +106,7 @@ namespace FirstStepsTweaks.Commands
 
                 if (secondsRemaining > 0)
                 {
-                    player.SendMessage(
-                        GlobalConstants.InfoLogChatGroup,
-                        $"Teleporting to your last location in {secondsRemaining}...",
-                        EnumChatType.Notification
-                    );
-
+                    player.SendIngameError("no_permission", $"Teleporting to your last location in {secondsRemaining}...");
                     secondsRemaining--;
                 }
                 else
@@ -117,11 +117,7 @@ namespace FirstStepsTweaks.Commands
                     player.Entity.TeleportToDouble(lastLocation.X, lastLocation.Y, lastLocation.Z);
                     LastPositionsByPlayerUid[player.PlayerUID] = currentLocation;
 
-                    player.SendMessage(
-                        GlobalConstants.InfoLogChatGroup,
-                        "Teleported to your last location.",
-                        EnumChatType.CommandSuccess
-                    );
+                    player.SendIngameError("no_permission", "Teleported to your last location.");
 
                     api.Event.UnregisterGameTickListener(listenerId);
                 }

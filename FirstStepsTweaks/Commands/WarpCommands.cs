@@ -122,7 +122,7 @@ namespace FirstStepsTweaks.Commands
             player.SendMessage(
                 GlobalConstants.InfoLogChatGroup,
                 $"Teleporting to warp '{warpName}' in {teleportConfig.WarmupSeconds} seconds. Do not move.",
-                EnumChatType.Notification
+                EnumChatType.CommandSuccess
             );
 
             listenerId = api.Event.RegisterGameTickListener((dt) =>
@@ -150,22 +150,15 @@ namespace FirstStepsTweaks.Commands
 
                 if (secondsRemaining > 0)
                 {
-                    player.SendMessage(
-                        GlobalConstants.InfoLogChatGroup,
-                        $"Teleporting to warp '{warpName}' in {secondsRemaining}...",
-                        EnumChatType.Notification
-                    );
+                    player.SendIngameError("no_permission", $"Teleporting to warp '{warpName}' in {secondsRemaining}...");
                     secondsRemaining--;
                 }
                 else
                 {
                     BackCommands.RecordCurrentLocation(player);
                     player.Entity.TeleportToDouble(targetX, targetY, targetZ);
-                    player.SendMessage(
-                        GlobalConstants.InfoLogChatGroup,
-                        $"Teleported to warp '{warpName}'.",
-                        EnumChatType.CommandSuccess
-                    );
+                    player.SendIngameError("no_permission", $"Teleported to warp '{warpName}'.");
+
                     api.Event.UnregisterGameTickListener(listenerId);
                 }
             }, teleportConfig.TickIntervalMs);

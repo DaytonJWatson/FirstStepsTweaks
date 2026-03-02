@@ -82,6 +82,11 @@ namespace FirstStepsTweaks.Commands
             int secondsRemaining = teleportConfig.WarmupSeconds;
             long listenerId = 0;
 
+            player.SendMessage(
+                GlobalConstants.InfoLogChatGroup,
+                $"Teleporting you in {teleportConfig.WarmupSeconds} seconds. Do not move.",
+                EnumChatType.CommandSuccess);
+
             listenerId = api.Event.RegisterGameTickListener((dt) =>
             {
                 if (player?.Entity == null)
@@ -108,22 +113,14 @@ namespace FirstStepsTweaks.Commands
 
                 if (secondsRemaining > 0)
                 {
-                    player.SendMessage(
-                        GlobalConstants.InfoLogChatGroup,
-                        $"Teleporting to spawn in {secondsRemaining}...",
-                        EnumChatType.Notification
-                    );
+                    player.SendIngameError("no_permission", $"Teleporting to spawn in {secondsRemaining}...");
                     secondsRemaining--;
                 }
                 else
                 {
                     BackCommands.RecordCurrentLocation(player);
                     player.Entity.TeleportToDouble(targetX, targetY, targetZ);
-                    player.SendMessage(
-                        GlobalConstants.InfoLogChatGroup,
-                        "Teleported to spawn.",
-                        EnumChatType.CommandSuccess
-                    );
+                    player.SendIngameError("no_permission", "Teleported to spawn.");
                     api.Event.UnregisterGameTickListener(listenerId);
                 }
 
