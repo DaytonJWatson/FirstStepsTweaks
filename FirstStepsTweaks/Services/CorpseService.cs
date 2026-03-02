@@ -235,6 +235,7 @@ namespace FirstStepsTweaks.Services
             tree.SetString("owner", player.PlayerUID);
             tree.SetString("ownerName", player.PlayerName);
             tree.SetInt("graveId", graveId > 0 ? graveId : GetOrCreateGraveId(pos));
+            tree.SetLong("createdAtMs", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             tree.SetInt("x", pos.X);
             tree.SetInt("y", pos.Y);
             tree.SetInt("z", pos.Z);
@@ -315,18 +316,23 @@ namespace FirstStepsTweaks.Services
             }
 
             string owner = tree.GetString("owner");
+            bool isOwner = owner == byPlayer.PlayerUID;
+            bool isExpired = IsGraveExpired(tree);
 
-            // NON-OWNER: put it back and delete the drop
-            if (owner != byPlayer.PlayerUID)
+            // NON-OWNER before expiration: put it back and delete the drop
+            if (!isOwner && !isExpired)
             {
+                long remainingMs = GetRemainingGraveTimeMs(tree);
+                int remainingMinutes = (int)Math.Ceiling(remainingMs / 60000d);
+
                 byPlayer.SendMessage(
                     GlobalConstants.InfoLogChatGroup,
-                    "This is not your grave.",
+                    $"This grave is protected for {remainingMinutes} more minute(s).",
                     EnumChatType.Notification
                 );
                 byPlayer.SendMessage(
                     GlobalConstants.GeneralChatGroup,
-                    "This is not your grave.",
+                    $"This grave is protected for {remainingMinutes} more minute(s).",
                     EnumChatType.Notification
                 );
 
@@ -344,6 +350,15 @@ namespace FirstStepsTweaks.Services
                 return;
             }
 
+            if (!isOwner && isExpired)
+            {
+                byPlayer.SendMessage(
+                    GlobalConstants.GeneralChatGroup,
+                    "This grave has expired. You recovered its items.",
+                    EnumChatType.Notification
+                );
+            }
+
             // OWNER: restore items
             List<ItemStack> stacks = LoadInventoryFromTree(tree);
             if (stacks != null && stacks.Count > 0)
@@ -357,8 +372,11 @@ namespace FirstStepsTweaks.Services
             // Clear saved data (your build has no DeleteData)
             api.WorldManager.SaveGame.StoreData(key, new byte[0]);
 
-            // Clear emergency backup once a grave is successfully claimed
-            api.WorldManager.SaveGame.StoreData(GetEmergencyBackupKey(byPlayer.PlayerUID), new byte[0]);
+            // Clear emergency backup once the owner successfully claims their grave
+            if (isOwner)
+            {
+                api.WorldManager.SaveGame.StoreData(GetEmergencyBackupKey(byPlayer.PlayerUID), new byte[0]);
+            }
 
             // Stop tracking as an active grave
             RemoveTrackedGrave(pos);
@@ -366,7 +384,7 @@ namespace FirstStepsTweaks.Services
             // Also remove the skull drop for owner breaks
             suppressDropPositions.Add(pos.Copy());
 
-            api.Logger.Warning($"[GRAVE] Restored grave at {pos}");
+            api.Logger.Warning($"[GRAVE] Restored grave at {pos} by {byPlayer.PlayerName} (owner={isOwner}, expired={isExpired})");
         }
 
         private void GiveItemsBack(IServerPlayer player, List<ItemStack> stacks)
@@ -423,6 +441,35 @@ namespace FirstStepsTweaks.Services
             }
 
             return stacks;
+        }
+
+        private long GetCreatedAtMs(TreeAttribute tree)
+        {
+            long createdAt = tree.GetLong("createdAtMs", 0L);
+            if (createdAt > 0) return createdAt;
+
+            return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        }
+
+        private bool IsGraveExpired(TreeAttribute tree)
+        {
+            long expireMs = corpseConfig.GraveExpireMs;
+            if (expireMs <= 0) return true;
+
+            long createdAt = GetCreatedAtMs(tree);
+            long ageMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - createdAt;
+            return ageMs >= expireMs;
+        }
+
+        private long GetRemainingGraveTimeMs(TreeAttribute tree)
+        {
+            long expireMs = corpseConfig.GraveExpireMs;
+            if (expireMs <= 0) return 0;
+
+            long createdAt = GetCreatedAtMs(tree);
+            long ageMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - createdAt;
+            long remaining = expireMs - ageMs;
+            return remaining > 0 ? remaining : 0;
         }
 
         private bool TryRestoreEmergencyBackup(IServerPlayer player, string reason)
