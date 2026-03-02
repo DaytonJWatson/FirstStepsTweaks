@@ -628,11 +628,11 @@ namespace FirstStepsTweaks.Services
 
         private void PlaceGraveBlock(BlockPos pos)
         {
-            Block block = api.World.GetBlock(new AssetLocation("game:figurehead-skull"));
+            Block block = api.World.GetBlock(new AssetLocation("game:clutter"));
             if (block == null) return;
 
             ItemStack stack = new ItemStack(block);
-            stack.Attributes.SetString("material", "larch");
+            stack.Attributes.SetString("type", "gravestone-3");
 
             api.World.BlockAccessor.SetBlock(block.BlockId, pos, stack);    
             api.World.BlockAccessor.MarkBlockDirty(pos);
