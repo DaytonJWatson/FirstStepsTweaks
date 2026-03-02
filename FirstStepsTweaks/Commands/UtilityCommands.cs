@@ -29,13 +29,6 @@ namespace FirstStepsTweaks.Commands
                 .RequiresPlayer()
                 .RequiresPrivilege(Privilege.chat)
                 .HandleWith(args => Wind(api, args));
-
-            api.ChatCommands
-                .Create("nextstorm")
-                .WithDescription("Shows the next temporal storm information")
-                .RequiresPlayer()
-                .RequiresPrivilege(Privilege.chat)
-                .HandleWith(args => NextStorm(api, args));
         }
 
         private static string GetWindCategory(float wind)
@@ -105,42 +98,6 @@ namespace FirstStepsTweaks.Commands
                 $"{header}{Environment.NewLine}{playerList}",
                 EnumChatType.CommandSuccess
             );
-
-            return TextCommandResult.Success();
-        }
-
-        private static TextCommandResult NextStorm(ICoreServerAPI api, TextCommandCallingArgs args)
-        {
-            var player = (IServerPlayer)args.Caller.Player;
-
-            var tree = api.World.Config;
-
-            double nextStart = tree.GetDouble("temporalStormNextStartTotalHours", -1);
-            double duration = tree.GetDouble("temporalStormDurationHours", 0);
-
-            if (nextStart < 0)
-            {
-                player.SendMessage(GlobalConstants.InfoLogChatGroup,
-                    "Temporal storms are disabled.",
-                    EnumChatType.CommandError);
-                return TextCommandResult.Success();
-            }
-
-            double currentHours = api.World.Calendar.TotalHours;
-            double hoursUntil = nextStart - currentHours;
-
-            if (hoursUntil <= 0)
-            {
-                player.SendMessage(GlobalConstants.InfoLogChatGroup,
-                    "A temporal storm is currently active.",
-                    EnumChatType.Notification);
-            }
-            else
-            {
-                player.SendMessage(GlobalConstants.InfoLogChatGroup,
-                    $"Next temporal storm in {hoursUntil:F1} hours.",
-                    EnumChatType.Notification);
-            }
 
             return TextCommandResult.Success();
         }
