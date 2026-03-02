@@ -136,13 +136,25 @@ namespace FirstStepsTweaks.Commands
                 Block groundBlock = api.World.BlockAccessor.GetBlock(groundPos);
 
                 if (feetBlock == null || headBlock == null || groundBlock == null) continue;
-                if (feetBlock.BlockId != 0 || headBlock.BlockId != 0) continue;
-                if (groundBlock.BlockId == 0) continue;
+                if (!IsPassableTeleportSpace(feetBlock) || !IsPassableTeleportSpace(headBlock)) continue;
+                if (!IsSafeTeleportGround(groundBlock)) continue;
 
                 return new Vec3d(x + 0.5, y, z + 0.5);
             }
 
             return null;
+        }
+
+        private static bool IsPassableTeleportSpace(Block block)
+        {
+            // Allow air and highly-replaceable non-solid blocks (tallgrass, flowers, etc.) as valid player space.
+            return block.BlockId == 0 || block.Replaceable >= 6000;
+        }
+
+        private static bool IsSafeTeleportGround(Block block)
+        {
+            // Ground must exist and be reasonably solid; exclude highly-replaceable blocks (flora/snow layers).
+            return block.BlockId != 0 && block.Replaceable < 6000;
         }
 
         private static void StartWarmupTeleport(ICoreServerAPI api, IServerPlayer player, Vec3d destination)
