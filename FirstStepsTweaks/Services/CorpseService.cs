@@ -15,6 +15,7 @@ namespace FirstStepsTweaks.Services
     {
         private readonly ICoreServerAPI api;
         private const string EmergencyBackupPrefix = "deathbones-emergency-";
+        private const string GraveIndexKey = "deathbones-index";
         private readonly HashSet<BlockPos> suppressDropPositions = new HashSet<BlockPos>();
         public class GraveSummary
         {
@@ -33,6 +34,7 @@ namespace FirstStepsTweaks.Services
         }
 
         private readonly Dictionary<string, GraveRecord> activeGravesByPos = new Dictionary<string, GraveRecord>();
+        private bool suspendIndexPersistence;
         private int nextGraveId = 1;
         private int graveBlockId;
         private readonly CorpseConfig corpseConfig;
@@ -47,6 +49,8 @@ namespace FirstStepsTweaks.Services
 
             api.Event.RegisterGameTickListener(RemoveGraveDrops, corpseConfig.DropCleanupTickMs);
             api.Event.RegisterGameTickListener(EnforceGravesPresent, corpseConfig.EnforceGraveTickMs);
+
+            LoadActiveGraveIndex();
         }
 
         private void RemoveGraveDrops(float dt)
@@ -125,14 +129,15 @@ namespace FirstStepsTweaks.Services
             if (savedStacks.Count == 0) return;
 
             BlockPos pos = entity.Pos.AsBlockPos.Copy();
+            int graveId = GetOrCreateGraveId(pos);
 
-            if (!SaveEmergencyBackup(player, savedStacks, pos))
+            if (!SaveEmergencyBackup(player, savedStacks, pos, graveId))
             {
                 api.Logger.Error($"[GRAVE SAVE] Failed emergency backup for {player.PlayerUID}. Inventory was not touched.");
                 return;
             }
 
-            if (!SaveToWorldData(player, savedStacks, pos))
+            if (!SaveToWorldData(player, savedStacks, pos, graveId))
             {
                 api.Logger.Error($"[GRAVE SAVE] Failed grave save for {player.PlayerUID}. Inventory was not touched.");
                 return;
@@ -172,9 +177,9 @@ namespace FirstStepsTweaks.Services
             }
         }
 
-        private bool SaveEmergencyBackup(IPlayer player, List<ItemStack> stacks, BlockPos pos)
+        private bool SaveEmergencyBackup(IPlayer player, List<ItemStack> stacks, BlockPos pos, int graveId)
         {
-            byte[] raw = SerializeGraveData(player, stacks, pos);
+            byte[] raw = SerializeGraveData(player, stacks, pos, graveId);
             if (raw == null || raw.Length == 0) return false;
 
             string backupKey = GetEmergencyBackupKey(player.PlayerUID);
@@ -190,7 +195,7 @@ namespace FirstStepsTweaks.Services
             return ok;
         }
 
-        private bool SaveToWorldData(IPlayer player, List<ItemStack> stacks, BlockPos pos)
+        private bool SaveToWorldData(IPlayer player, List<ItemStack> stacks, BlockPos pos, int graveId)
         {
             string key = $"deathbones-{pos.X}-{pos.Y}-{pos.Z}";
 
@@ -208,7 +213,7 @@ namespace FirstStepsTweaks.Services
 
             mergedStacks.AddRange(stacks);
 
-            byte[] raw = SerializeGraveData(player, mergedStacks, pos, GetOrCreateGraveId(pos));
+            byte[] raw = SerializeGraveData(player, mergedStacks, pos, graveId);
             if (raw == null || raw.Length == 0) return false;
 
             api.WorldManager.SaveGame.StoreData(key, raw);
@@ -571,6 +576,11 @@ namespace FirstStepsTweaks.Services
                 OwnerName = string.IsNullOrEmpty(ownerName) ? ownerUid : ownerName,
                 Position = pos.Copy()
             };
+
+            if (!suspendIndexPersistence)
+            {
+                SaveActiveGraveIndex();
+            }
         }
 
         private void EnsureTrackedFromRaw(BlockPos pos, byte[] raw)
@@ -613,7 +623,95 @@ namespace FirstStepsTweaks.Services
 
         private void RemoveTrackedGrave(BlockPos pos)
         {
-            activeGravesByPos.Remove(GetPositionKey(pos));
+            if (activeGravesByPos.Remove(GetPositionKey(pos)) && !suspendIndexPersistence)
+            {
+                SaveActiveGraveIndex();
+            }
+        }
+
+        private void SaveActiveGraveIndex()
+        {
+            TreeAttribute indexTree = new TreeAttribute();
+            int i = 0;
+
+            foreach (var record in activeGravesByPos.Values)
+            {
+                TreeAttribute recordTree = new TreeAttribute();
+                recordTree.SetInt("graveId", record.GraveId);
+                recordTree.SetString("ownerUid", record.OwnerUid ?? string.Empty);
+                recordTree.SetString("ownerName", record.OwnerName ?? string.Empty);
+                recordTree.SetInt("x", record.Position.X);
+                recordTree.SetInt("y", record.Position.Y);
+                recordTree.SetInt("z", record.Position.Z);
+                indexTree[$"grave{i}"] = recordTree;
+                i++;
+            }
+
+            indexTree.SetInt("count", i);
+
+            using (MemoryStream ms = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(ms))
+            {
+                indexTree.ToBytes(writer);
+                api.WorldManager.SaveGame.StoreData(GraveIndexKey, ms.ToArray());
+            }
+        }
+
+        private void LoadActiveGraveIndex()
+        {
+            byte[] raw = api.WorldManager.SaveGame.GetData(GraveIndexKey);
+            if (raw == null || raw.Length == 0) return;
+
+            TreeAttribute indexTree;
+            using (MemoryStream ms = new MemoryStream(raw))
+            using (BinaryReader reader = new BinaryReader(ms))
+            {
+                indexTree = new TreeAttribute();
+                indexTree.FromBytes(reader);
+            }
+
+            int count = indexTree.GetInt("count", 0);
+            bool shouldRewriteIndex = false;
+
+            suspendIndexPersistence = true;
+            for (int i = 0; i < count; i++)
+            {
+                if (!(indexTree[$"grave{i}"] is TreeAttribute recordTree)) continue;
+
+                BlockPos pos = new BlockPos(
+                    recordTree.GetInt("x", 0),
+                    recordTree.GetInt("y", 0),
+                    recordTree.GetInt("z", 0)
+                );
+
+                string key = $"deathbones-{pos.X}-{pos.Y}-{pos.Z}";
+                byte[] graveRaw = api.WorldManager.SaveGame.GetData(key);
+                if (graveRaw == null || graveRaw.Length == 0)
+                {
+                    shouldRewriteIndex = true;
+                    continue;
+                }
+
+                int graveId = recordTree.GetInt("graveId", 0);
+                if (graveId <= 0)
+                {
+                    graveId = GetOrCreateGraveId(pos);
+                    shouldRewriteIndex = true;
+                }
+
+                TrackOrUpdateActiveGrave(
+                    pos,
+                    recordTree.GetString("ownerUid"),
+                    recordTree.GetString("ownerName"),
+                    graveId
+                );
+            }
+            suspendIndexPersistence = false;
+
+            if (shouldRewriteIndex)
+            {
+                SaveActiveGraveIndex();
+            }
         }
 
         private string GetPositionKey(BlockPos pos)
