@@ -6,6 +6,11 @@ using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
+/* NOT FINISHED!!!!!!!!!!
+ * This one is a bit fucky, doesnt seem to want to work if you change the min/max radius
+ * tbh, i dont even know if i want to implement it anyway
+ */
+
 namespace FirstStepsTweaks.Commands
 {
     public static class RtpCommands
@@ -25,7 +30,7 @@ namespace FirstStepsTweaks.Commands
                 .Create("rtp")
                 .WithDescription("Teleport to a random location")
                 .RequiresPlayer()
-                .RequiresPrivilege(Privilege.chat)
+                .RequiresPrivilege(Privilege.controlserver)
                 .HandleWith(args => RandomTeleport(api, args));
         }
 
