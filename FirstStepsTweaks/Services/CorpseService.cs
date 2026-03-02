@@ -281,15 +281,15 @@ namespace FirstStepsTweaks.Services
 
             PlaceGraveBlock(pos);
         }
-        public void OnBlockBroken(IServerPlayer byPlayer, int oldblockId, BlockSelection blockSel)
+        public bool OnTryBlockBreak(IServerPlayer byPlayer, BlockSelection blockSel, ref float blockResistance, ref EnumHandling handling)
         {
-            if (byPlayer == null || blockSel == null) return;
+            if (byPlayer == null || blockSel == null) return true;
 
             BlockPos pos = blockSel.Position;
 
             // Only care about our grave block breaks
-            Block block = api.World.GetBlock(oldblockId);
-            if (block == null || block.Code.Path != GetGravePath()) return;
+            Block block = api.World.BlockAccessor.GetBlock(pos);
+            if (block == null || block.Code == null || block.Code.Path != GetGravePath()) return true;
 
             string key = $"deathbones-{pos.X}-{pos.Y}-{pos.Z}";
             byte[] raw = api.WorldManager.SaveGame.GetData(key);
@@ -298,7 +298,8 @@ namespace FirstStepsTweaks.Services
             if (raw == null || raw.Length == 0)
             {
                 TryRestoreEmergencyBackup(byPlayer, "missing grave data");
-                return;
+                handling = EnumHandling.PreventDefault;
+                return false;
             }
 
             TreeAttribute tree;
@@ -331,7 +332,8 @@ namespace FirstStepsTweaks.Services
 
                 // Keep tracking it as an active grave
                 EnsureTrackedFromRaw(pos, raw);
-                return;
+                handling = EnumHandling.PreventDefault;
+                return false;
             }
 
             // OWNER: restore items
@@ -341,8 +343,9 @@ namespace FirstStepsTweaks.Services
                 GiveItemsBack(byPlayer, stacks);
             }
 
-            // Remove the grave block (already broken, but keep consistent)
-            // (No need to set air; it is already air after DidBreakBlock)
+            // We consume this break event ourselves so clutter logic is bypassed.
+            // Remove the grave block manually and prevent the default break handling.
+            api.World.BlockAccessor.SetBlock(0, pos);
 
             // Clear saved data (your build has no DeleteData)
             api.WorldManager.SaveGame.StoreData(key, new byte[0]);
@@ -357,6 +360,8 @@ namespace FirstStepsTweaks.Services
             suppressDropPositions.Add(pos.Copy());
 
             api.Logger.Warning($"[GRAVE] Restored grave at {pos}");
+            handling = EnumHandling.PreventDefault;
+            return false;
         }
 
         private void GiveItemsBack(IServerPlayer player, List<ItemStack> stacks)
