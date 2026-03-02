@@ -110,7 +110,7 @@ namespace FirstStepsTweaks.Config
 
     public class CorpseConfig
     {
-        public string GraveBlockCode { get; set; } = "game:figurehead-skull";
+        public string GraveBlockCode { get; set; } = "game:clutter";
         public int DropCleanupTickMs { get; set; } = 50;
         public int EnforceGraveTickMs { get; set; } = 200;
         public long GraveExpireMs { get; set; } = 3600000;
