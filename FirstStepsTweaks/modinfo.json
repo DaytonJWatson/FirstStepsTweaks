@@ -4,7 +4,7 @@
   "name": "First Steps Tweaks",
   "version": "1.0.0",
   "description": "First Steps server tweaks",
-  "authors": ["YourName"],
+  "authors": ["Unsocial"],
   "side": "Server",
   "dependencies": {
     "game": "*"
