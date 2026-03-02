@@ -49,7 +49,7 @@ namespace FirstStepsTweaks.Commands
                 }
             }
 
-            Vec3d? destination = FindDestination(api, player);
+            Vec3d destination = FindDestination(api, player);
             if (destination == null)
             {
                 player.SendMessage(
@@ -62,12 +62,12 @@ namespace FirstStepsTweaks.Commands
 
             if (rtpConfig.UseWarmup && teleportConfig.WarmupSeconds > 0)
             {
-                StartWarmupTeleport(api, player, destination.Value);
+                StartWarmupTeleport(api, player, destination);
             }
             else
             {
                 BackCommands.RecordCurrentLocation(player);
-                player.Entity.TeleportToDouble(destination.Value.X, destination.Value.Y, destination.Value.Z);
+                player.Entity.TeleportToDouble(destination.X, destination.Y, destination.Z);
                 player.SendMessage(
                     GlobalConstants.InfoLogChatGroup,
                     "Teleported to a random location.",
@@ -79,7 +79,7 @@ namespace FirstStepsTweaks.Commands
             return TextCommandResult.Success();
         }
 
-        private static Vec3d? FindDestination(ICoreServerAPI api, IServerPlayer player)
+        private static Vec3d FindDestination(ICoreServerAPI api, IServerPlayer player)
         {
             int attempts = Math.Max(1, rtpConfig.MaxAttempts);
             int minRadius = Math.Max(0, rtpConfig.MinRadius);
@@ -95,7 +95,7 @@ namespace FirstStepsTweaks.Commands
 
                 int x = (int)Math.Round(centerX + Math.Cos(angle) * distance);
                 int z = (int)Math.Round(centerZ + Math.Sin(angle) * distance);
-                int y = api.World.BlockAccessor.GetTerrainMapheightAt(x, z) + 1;
+                int y = api.World.BlockAccessor.GetTerrainMapheightAt(new BlockPos(x, 0, z)) + 1;
 
                 if (y <= 1) continue;
 
