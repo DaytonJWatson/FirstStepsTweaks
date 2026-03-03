@@ -36,7 +36,6 @@ namespace FirstStepsTweaks.Services
         }
 
         private readonly Dictionary<string, GraveRecord> activeGravesByPos = new Dictionary<string, GraveRecord>();
-        private readonly HashSet<int> removedOrClaimedGraveIds = new HashSet<int>();
         private readonly HashSet<string> deathProcessingPlayers = new HashSet<string>();
         private readonly object deathProcessingLock = new object();
         private bool suspendIndexPersistence;
@@ -106,7 +105,7 @@ namespace FirstStepsTweaks.Services
                     if (raw == null || raw.Length == 0) continue;
 
                     int graveId = ReadGraveId(raw, pos);
-                    if (graveId <= 0 || removedOrClaimedGraveIds.Contains(graveId)) continue;
+                    if (graveId <= 0) continue;
 
                     PlaceGraveBlock(pos);
                 }
@@ -256,6 +255,22 @@ namespace FirstStepsTweaks.Services
                 return false;
             }
 
+            TreeAttribute confirmTree;
+            using (MemoryStream confirmMs = new MemoryStream(confirm))
+            using (BinaryReader confirmReader = new BinaryReader(confirmMs))
+            {
+                confirmTree = new TreeAttribute();
+                confirmTree.FromBytes(confirmReader);
+            }
+
+            string persistedDeathEventId = confirmTree.GetString("deathEventId");
+            if (persistedDeathEventId != deathEventId)
+            {
+                api.Logger.Error($"[GRAVE SAVE] Death event mismatch at {pos} for {player.PlayerUID} graveId={graveId}; expected={deathEventId}, actual={persistedDeathEventId ?? "<null>"}");
+                api.WorldManager.SaveGame.StoreData(key, new byte[0]);
+                return false;
+            }
+
             TrackOrUpdateActiveGrave(pos, player.PlayerUID, player.PlayerName, ReadGraveId(raw, pos));
             api.Logger.Warning($"[GRAVE SAVE] Stored grave at {pos} with {stacks.Count} stack(s) graveId={graveId}");
             return true;
@@ -284,8 +299,6 @@ namespace FirstStepsTweaks.Services
             tree.SetInt("x", pos.X);
             tree.SetInt("y", pos.Y);
             tree.SetInt("z", pos.Z);
-            tree.SetBool("claimed", false);
-
             TreeAttribute invTree = new TreeAttribute();
 
             for (int i = 0; i < stacks.Count; i++)
@@ -364,15 +377,6 @@ namespace FirstStepsTweaks.Services
             string owner = tree.GetString("owner");
             bool isOwner = owner == byPlayer.PlayerUID;
             bool isExpired = IsGraveExpired(tree);
-            bool isClaimed = tree.GetBool("claimed", false);
-
-            if (isClaimed)
-            {
-                suppressDropPositions.Add(pos.Copy());
-                RemoveTrackedGrave(pos);
-                return;
-            }
-
             // NON-OWNER before expiration: put it back and delete the drop
             if (!isOwner && !isExpired)
             {
@@ -419,7 +423,6 @@ namespace FirstStepsTweaks.Services
             long restoredAtMs = GetBackupRestoredAtMs(byPlayer.PlayerUID);
             if (isOwner && restoredAtMs > 0 && createdAtMs <= restoredAtMs)
             {
-                MarkGraveClaimed(key, tree);
                 api.WorldManager.SaveGame.StoreData(key, new byte[0]);
                 RemoveTrackedGrave(pos);
                 suppressDropPositions.Add(pos.Copy());
@@ -432,12 +435,10 @@ namespace FirstStepsTweaks.Services
                 return;
             }
 
-            removedOrClaimedGraveIds.Add(graveId);
-
-            // Mark claimed and delete persisted grave data before giving items back.
-            MarkGraveClaimed(key, tree);
+            // Delete persisted grave data before giving items back.
             api.WorldManager.SaveGame.StoreData(key, new byte[0]);
             RemoveTrackedGrave(pos);
+            suppressDropPositions.Add(pos.Copy());
 
             List<ItemStack> stacks = LoadInventoryFromTree(tree);
             if (stacks != null && stacks.Count > 0)
@@ -454,28 +455,55 @@ namespace FirstStepsTweaks.Services
                 ClearEmergencyBackup(byPlayer.PlayerUID, graveId, "grave claimed");
             }
 
-            // Also remove the skull drop for owner breaks
-            suppressDropPositions.Add(pos.Copy());
-
             api.Logger.Warning($"[GRAVE RESTORE] Restored graveId={graveId} at {pos} by {byPlayer.PlayerName} (owner={isOwner}, expired={isExpired})");
         }
 
         private void GiveItemsBack(IServerPlayer player, List<ItemStack> stacks)
         {
+            int totalSerializedStacks = 0;
+            foreach (var serialized in stacks)
+            {
+                if (serialized != null && serialized.StackSize > 0)
+                {
+                    totalSerializedStacks += serialized.StackSize;
+                }
+            }
+
+            int totalRestoredStacks = 0;
 
             foreach (var stack in stacks)
             {
                 if (stack == null || stack.StackSize <= 0) continue;
 
+                int remainingAllowed = totalSerializedStacks - totalRestoredStacks;
+                if (remainingAllowed <= 0)
+                {
+                    api.Logger.Warning($"[GRAVE GIVE] Stopping restore for {player.PlayerUID}; reached serialized stack cap {totalSerializedStacks}.");
+                    break;
+                }
+
                 api.Logger.Warning($"[GRAVE GIVE] Attempting to give {stack.Collectible?.Code} x{stack.StackSize}");
 
                 ItemStack giveStack = stack.Clone();
+                if (giveStack.StackSize > remainingAllowed)
+                {
+                    giveStack.StackSize = remainingAllowed;
+                }
+
+                int beforeGive = giveStack.StackSize;
 
                 bool fullyGiven = player.InventoryManager.TryGiveItemstack(giveStack, true);
                 api.Logger.Warning($"[GRAVE GIVE] Remaining stack size after give: {giveStack.StackSize}");
 
+                int restoredThisStack = beforeGive - Math.Max(giveStack.StackSize, 0);
+                if (restoredThisStack > 0)
+                {
+                    totalRestoredStacks += restoredThisStack;
+                }
+
                 if (!fullyGiven && giveStack.StackSize > 0)
                 {
+                    totalRestoredStacks += giveStack.StackSize;
                     api.World.SpawnItemEntity(giveStack, player.Entity.Pos.XYZ);
                 }
             }
@@ -608,12 +636,16 @@ namespace FirstStepsTweaks.Services
 
         private bool TryRestoreAfterSaveFailure(IPlayer player, List<ItemStack> savedStacks, int graveId, string expectedDeathEventId)
         {
+            bool restoredWithBackup = false;
+
             if (player is IServerPlayer serverPlayer)
             {
-                if (TryRestoreEmergencyBackup(serverPlayer, "grave save failed", null, expectedDeathEventId))
-                {
-                    return true;
-                }
+                restoredWithBackup = TryRestoreEmergencyBackup(serverPlayer, "grave save failed", null, expectedDeathEventId);
+            }
+
+            if (restoredWithBackup)
+            {
+                return true;
             }
 
             if (savedStacks == null || savedStacks.Count == 0) return false;
@@ -655,16 +687,16 @@ namespace FirstStepsTweaks.Services
             return TryRemoveGrave(pos);
         }
 
-        public bool TryDuplicateGraveItemsById(int graveId, IServerPlayer target)
+        public bool TryDuplicateGraveItemsById(int graveId, IServerPlayer caller, IServerPlayer target)
         {
             if (!TryGetPositionByGraveId(graveId, out BlockPos pos)) return false;
-            return TryDuplicateGraveItems(pos, target);
+            return TryDuplicateGraveItems(pos, caller, target);
         }
 
-        public bool TryGiveGraveItemsById(int graveId, IServerPlayer target)
+        public bool TryGiveGraveItemsById(int graveId, IServerPlayer caller, IServerPlayer target)
         {
             if (!TryGetPositionByGraveId(graveId, out BlockPos pos)) return false;
-            return TryGiveGraveItems(pos, target);
+            return TryGiveGraveItems(pos, caller, target);
         }
 
         public bool TryRemoveGrave(BlockPos pos)
@@ -680,8 +712,6 @@ namespace FirstStepsTweaks.Services
             }
 
             api.WorldManager.SaveGame.StoreData(key, new byte[0]);
-            int graveId = ReadGraveId(raw, pos);
-            removedOrClaimedGraveIds.Add(graveId);
             RemoveTrackedGrave(pos);
 
             Block current = api.World.BlockAccessor.GetBlock(pos);
@@ -693,9 +723,10 @@ namespace FirstStepsTweaks.Services
             return true;
         }
 
-        public bool TryDuplicateGraveItems(BlockPos pos, IServerPlayer target)
+        public bool TryDuplicateGraveItems(BlockPos pos, IServerPlayer caller, IServerPlayer target)
         {
-            if (pos == null || target == null) return false;
+            if (pos == null || caller == null || target == null) return false;
+            if (!caller.HasPrivilege(Privilege.controlserver)) return false;
             if (!TryValidateGraveAccess(pos, out _, out _)) return false;
 
             List<ItemStack> stacks = LoadStacksAtPos(pos);
@@ -705,9 +736,10 @@ namespace FirstStepsTweaks.Services
             return true;
         }
 
-        public bool TryGiveGraveItems(BlockPos pos, IServerPlayer target)
+        public bool TryGiveGraveItems(BlockPos pos, IServerPlayer caller, IServerPlayer target)
         {
-            if (pos == null || target == null) return false;
+            if (pos == null || caller == null || target == null) return false;
+            if (!caller.HasPrivilege(Privilege.controlserver)) return false;
             if (!TryValidateGraveAccess(pos, out _, out _)) return false;
 
             List<ItemStack> stacks = LoadStacksAtPos(pos);
@@ -747,7 +779,7 @@ namespace FirstStepsTweaks.Services
             }
 
             graveId = tree.GetInt("graveId", 0);
-            if (graveId <= 0 || removedOrClaimedGraveIds.Contains(graveId)) return false;
+            if (graveId <= 0) return false;
 
             expired = IsGraveExpired(tree);
             if (expired) return false;
@@ -913,12 +945,6 @@ namespace FirstStepsTweaks.Services
                     continue;
                 }
 
-                if (IsClaimedGrave(graveRaw))
-                {
-                    shouldRewriteIndex = true;
-                    continue;
-                }
-
                 int graveId = recordTree.GetInt("graveId", 0);
                 if (graveId <= 0)
                 {
@@ -955,7 +981,11 @@ namespace FirstStepsTweaks.Services
         {
             if (CanUseGravePosition(requestedPos))
             {
-                return requestedPos.Copy();
+                BlockPos validatedRequestedPos = requestedPos.Copy();
+                if (CanUseGravePosition(validatedRequestedPos))
+                {
+                    return validatedRequestedPos;
+                }
             }
 
             int[] yOffsets = new[] { 0, 1, -1, 2, -2 };
@@ -973,7 +1003,10 @@ namespace FirstStepsTweaks.Services
                             BlockPos candidate = new BlockPos(requestedPos.X + dx, requestedPos.Y + yOffset, requestedPos.Z + dz);
                             if (CanUseGravePosition(candidate))
                             {
-                                return candidate;
+                                if (CanUseGravePosition(candidate))
+                                {
+                                    return candidate;
+                                }
                             }
                         }
                     }
@@ -1031,31 +1064,6 @@ namespace FirstStepsTweaks.Services
             }
 
             return tree.GetLong("backupRestoredAtMs", 0);
-        }
-
-        private void MarkGraveClaimed(string key, TreeAttribute tree)
-        {
-            tree.SetBool("claimed", true);
-
-            using (MemoryStream ms = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(ms))
-            {
-                tree.ToBytes(writer);
-                api.WorldManager.SaveGame.StoreData(key, ms.ToArray());
-            }
-        }
-
-        private bool IsClaimedGrave(byte[] raw)
-        {
-            TreeAttribute tree;
-            using (var ms = new MemoryStream(raw))
-            using (var reader = new BinaryReader(ms))
-            {
-                tree = new TreeAttribute();
-                tree.FromBytes(reader);
-            }
-
-            return tree.GetBool("claimed", false);
         }
 
         private bool TryBeginDeathProcessing(string playerUid)
