@@ -102,7 +102,7 @@ namespace FirstStepsTweaks.Commands
                 return TextCommandResult.Success();
             }
 
-            if (!corpseService.TryDuplicateGraveItemsById(graveId, target))
+            if (!corpseService.TryDuplicateGraveItemsById(graveId, caller, target))
             {
                 caller.SendMessage(GlobalConstants.InfoLogChatGroup, "No grave inventory found for that ID.", EnumChatType.CommandError);
                 return TextCommandResult.Success();
@@ -125,7 +125,7 @@ namespace FirstStepsTweaks.Commands
                 return TextCommandResult.Success();
             }
 
-            if (!corpseService.TryGiveGraveItemsById(graveId, target))
+            if (!corpseService.TryGiveGraveItemsById(graveId, caller, target))
             {
                 caller.SendMessage(GlobalConstants.InfoLogChatGroup, "No grave inventory found for that ID.", EnumChatType.CommandError);
                 return TextCommandResult.Success();
