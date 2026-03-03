@@ -18,6 +18,7 @@ namespace FirstStepsTweaks.Services
         private const string BackupRestoredAtPrefix = "deathbones-backup-restored-at-";
         private const string GraveIndexKey = "deathbones-index";
         private const int GraveSearchRadius = 4;
+        private static readonly int[] GraveSearchYOffsets = { 0, 1, -1, 2, -2 };
         private readonly HashSet<BlockPos> suppressDropPositions = new HashSet<BlockPos>();
         public class GraveSummary
         {
@@ -41,12 +42,14 @@ namespace FirstStepsTweaks.Services
         private bool suspendIndexPersistence;
         private int nextGraveId = 1;
         private int graveBlockId;
+        private readonly string gravePath;
         private readonly CorpseConfig corpseConfig;
 
         public CorpseService(ICoreServerAPI api, FirstStepsTweaksConfig config)
         {
             this.api = api;
             corpseConfig = config?.Corpse ?? new CorpseConfig();
+            gravePath = new AssetLocation(corpseConfig.GraveBlockCode).Path;
 
             Block grave = api.World.GetBlock(new AssetLocation(corpseConfig.GraveBlockCode));
             graveBlockId = grave?.BlockId ?? 0;
@@ -73,7 +76,7 @@ namespace FirstStepsTweaks.Services
                 foreach (var entity in entities)
                 {
                     if (entity is EntityItem item &&
-                        item.Itemstack?.Collectible?.Code?.Path == GetGravePath())
+                        item.Itemstack?.Collectible?.Code?.Path == gravePath)
                     {
                         item.Die();
                         api.Logger.Warning("[GRAVE] Skull drop removed.");
@@ -95,7 +98,7 @@ namespace FirstStepsTweaks.Services
                 Block current = api.World.BlockAccessor.GetBlock(pos);
                 if (current == null || current.Code == null) continue;
 
-                if (current.Code.Path != GetGravePath())
+                if (current.Code.Path != gravePath)
                 {
                     // Only restore if still tracked and the save key still exists.
                     if (!activeGravesByPos.ContainsKey(GetPositionKey(pos))) continue;
@@ -354,7 +357,7 @@ namespace FirstStepsTweaks.Services
 
             // Only care about our grave block breaks
             Block block = api.World.GetBlock(oldblockId);
-            if (block == null || block.Code.Path != GetGravePath()) return;
+            if (block == null || block.Code.Path != gravePath) return;
 
             string key = GetGraveDataKey(pos);
             byte[] raw = api.WorldManager.SaveGame.GetData(key);
@@ -715,7 +718,7 @@ namespace FirstStepsTweaks.Services
             RemoveTrackedGrave(pos);
 
             Block current = api.World.BlockAccessor.GetBlock(pos);
-            if (current != null && current.Code != null && current.Code.Path == GetGravePath())
+            if (current != null && current.Code != null && current.Code.Path == gravePath)
             {
                 api.World.BlockAccessor.SetBlock(0, pos);
             }
@@ -981,14 +984,8 @@ namespace FirstStepsTweaks.Services
         {
             if (CanUseGravePosition(requestedPos))
             {
-                BlockPos validatedRequestedPos = requestedPos.Copy();
-                if (CanUseGravePosition(validatedRequestedPos))
-                {
-                    return validatedRequestedPos;
-                }
+                return requestedPos.Copy();
             }
-
-            int[] yOffsets = new[] { 0, 1, -1, 2, -2 };
 
             for (int radius = 1; radius <= GraveSearchRadius; radius++)
             {
@@ -998,15 +995,12 @@ namespace FirstStepsTweaks.Services
                     {
                         if (Math.Abs(dx) != radius && Math.Abs(dz) != radius) continue;
 
-                        foreach (int yOffset in yOffsets)
+                        foreach (int yOffset in GraveSearchYOffsets)
                         {
                             BlockPos candidate = new BlockPos(requestedPos.X + dx, requestedPos.Y + yOffset, requestedPos.Z + dz);
                             if (CanUseGravePosition(candidate))
                             {
-                                if (CanUseGravePosition(candidate))
-                                {
-                                    return candidate;
-                                }
+                                return candidate;
                             }
                         }
                     }
@@ -1026,7 +1020,7 @@ namespace FirstStepsTweaks.Services
 
             Block block = api.World.BlockAccessor.GetBlock(pos);
             if (block == null || block.Code == null) return false;
-            if (block.Code.Path == GetGravePath()) return false;
+            if (block.Code.Path == gravePath) return false;
 
             return block.Replaceable >= 6000;
         }
@@ -1084,7 +1078,7 @@ namespace FirstStepsTweaks.Services
 
         private string GetGravePath()
         {
-            return new AssetLocation(corpseConfig.GraveBlockCode).Path;
+            return gravePath;
         }
 
         private void PlaceGraveBlock(BlockPos pos)
