@@ -117,7 +117,7 @@ namespace FirstStepsTweaks.Services
 
         private static string BuildMessage(string template, ClaimSnapshot claim, IServerPlayer player)
         {
-            string ownerName = claim.OwnerName;
+            string ownerName = NormalizeOwnerName(claim.OwnerName);
             if (string.IsNullOrWhiteSpace(ownerName) || ownerName.Equals(player.PlayerUID, StringComparison.OrdinalIgnoreCase))
             {
                 ownerName = "Unknown";
@@ -134,6 +134,20 @@ namespace FirstStepsTweaks.Services
                 .Replace("{owner}", ownerName)
                 .Replace("{claim}", claimName)
                 .Replace("{player}", player.PlayerName);
+        }
+
+        private static string NormalizeOwnerName(string ownerName)
+        {
+            if (string.IsNullOrWhiteSpace(ownerName)) return ownerName;
+
+            const string playerPrefix = "Player ";
+            string normalized = ownerName.Trim();
+            if (normalized.StartsWith(playerPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.Substring(playerPrefix.Length).TrimStart();
+            }
+
+            return normalized;
         }
 
         private static void Send(IServerPlayer player, string message)
