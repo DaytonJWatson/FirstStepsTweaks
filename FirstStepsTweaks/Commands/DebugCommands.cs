@@ -14,6 +14,13 @@ namespace FirstStepsTweaks.Commands
 {
     public class DebugCommands
     {
+        private ICoreServerAPI api;
+
+        public DebugCommands(ICoreServerAPI api)
+        {
+            this.api = api;
+        }
+
         public static void Register(ICoreServerAPI api)
         {
             api.ChatCommands
@@ -23,38 +30,30 @@ namespace FirstStepsTweaks.Commands
                 .RequiresPrivilege(Privilege.controlserver)
                 .HandleWith(args => fsDebug(api, args));
         }
-
         private static TextCommandResult fsDebug(ICoreServerAPI api, TextCommandCallingArgs args)
         {
             IServerPlayer player = args.Caller.Player as IServerPlayer;
-            if (player == null) return TextCommandResult.Error("Player only");
+            if (player == null) return TextCommandResult.Error("Player only command");
 
-            BlockPos pos = player.Entity.ServerPos.AsBlockPos.Copy();
-            pos.Up();
+            Block block = api.World.GetBlock(new AssetLocation("firststepstweaks:gravestone"));
+            if (block == null) return TextCommandResult.Error("Gravestone block not found");
 
-            AssetLocation entityCode = new AssetLocation("game:chicken-hen");
-            EntityProperties type = api.World.GetEntityType(entityCode);
+            BlockPos pos = player.Entity.Pos.AsBlockPos.Copy();
+            pos.Y--; // place at feet
 
-            if (type == null)
-                return TextCommandResult.Error("Entity type not found");
+            api.World.BlockAccessor.SetBlock(block.BlockId, pos);
+            api.World.BlockAccessor.MarkBlockDirty(pos);
 
-            Entity entity = api.World.ClassRegistry.CreateEntity(type);
+            return TextCommandResult.Success("Ran debug command");
+        }
 
-            entity.ServerPos.SetPos(
-                pos.X + 0.5,
-                pos.Y + 1.5,
-                pos.Z + 0.5
-            );
+        public static void DebugBlock(IServerPlayer player, BlockSelection blockSel)
+        {
+            if (player == null) return;
 
-            entity.Pos.SetFrom(entity.ServerPos);
+            BlockPos pos = blockSel.Position;
 
-            api.World.SpawnEntity(entity);
-
-            // Set custom name
-            entity.WatchedAttributes.SetString("name", "☠ FLOATING TEXT TEST ☠");
-            entity.WatchedAttributes.MarkPathDirty("name");
-
-            return TextCommandResult.Success("Spawned test entity");
+            player.SendMessage(GlobalConstants.GeneralChatGroup, $"Used block at {pos}", EnumChatType.Notification);
         }
     }
 }
