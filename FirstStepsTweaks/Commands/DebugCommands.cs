@@ -32,28 +32,7 @@ namespace FirstStepsTweaks.Commands
         }
         private static TextCommandResult fsDebug(ICoreServerAPI api, TextCommandCallingArgs args)
         {
-            IServerPlayer player = args.Caller.Player as IServerPlayer;
-            if (player == null) return TextCommandResult.Error("Player only command");
-
-            Block block = api.World.GetBlock(new AssetLocation("firststepstweaks:gravestone"));
-            if (block == null) return TextCommandResult.Error("Gravestone block not found");
-
-            BlockPos pos = player.Entity.Pos.AsBlockPos.Copy();
-            pos.Y--; // place at feet
-
-            api.World.BlockAccessor.SetBlock(block.BlockId, pos);
-            api.World.BlockAccessor.MarkBlockDirty(pos);
-
             return TextCommandResult.Success("Ran debug command");
-        }
-
-        public static void DebugBlock(IServerPlayer player, BlockSelection blockSel)
-        {
-            if (player == null) return;
-
-            BlockPos pos = blockSel.Position;
-
-            player.SendMessage(GlobalConstants.GeneralChatGroup, $"Used block at {pos}", EnumChatType.Notification);
         }
     }
 }

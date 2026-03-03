@@ -131,7 +131,7 @@ namespace FirstStepsTweaks.Services
             string claimName = string.IsNullOrWhiteSpace(claim.ClaimName) ? "Unnamed claim" : claim.ClaimName;
 
             return (template ?? string.Empty)
-                .Replace("{owner}", ownerName)
+                .Replace("{owner}", ownerName+"'s")
                 .Replace("{claim}", claimName)
                 .Replace("{player}", player.PlayerName);
         }

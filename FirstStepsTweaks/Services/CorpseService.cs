@@ -344,6 +344,8 @@ namespace FirstStepsTweaks.Services
 
             BlockPos pos = blockSel.Position;
 
+            if (!activeGravesByPos.ContainsKey(GetPositionKey(pos))) return;
+
             // Only care about our grave block breaks
             Block block = api.World.GetBlock(oldblockId);
             if (block == null || block.Code.Path != gravePath) return;
@@ -451,48 +453,13 @@ namespace FirstStepsTweaks.Services
 
         private void GiveItemsBack(IServerPlayer player, List<ItemStack> stacks)
         {
-            int totalSerializedStacks = 0;
-            foreach (var serialized in stacks)
-            {
-                if (serialized != null && serialized.StackSize > 0)
-                {
-                    totalSerializedStacks += serialized.StackSize;
-                }
-            }
-
-            int totalRestoredStacks = 0;
-
             foreach (var stack in stacks)
             {
                 if (stack == null || stack.StackSize <= 0) continue;
 
-                int remainingAllowed = totalSerializedStacks - totalRestoredStacks;
-                if (remainingAllowed <= 0)
-                {
-                    break;
-                }
-
                 ItemStack giveStack = stack.Clone();
-                if (giveStack.StackSize > remainingAllowed)
-                {
-                    giveStack.StackSize = remainingAllowed;
-                }
 
-                int beforeGive = giveStack.StackSize;
-
-                bool fullyGiven = player.InventoryManager.TryGiveItemstack(giveStack, true);
-
-                int restoredThisStack = beforeGive - Math.Max(giveStack.StackSize, 0);
-                if (restoredThisStack > 0)
-                {
-                    totalRestoredStacks += restoredThisStack;
-                }
-
-                if (!fullyGiven && giveStack.StackSize > 0)
-                {
-                    totalRestoredStacks += giveStack.StackSize;
-                    api.World.SpawnItemEntity(giveStack, player.Entity.Pos.XYZ);
-                }
+                player.InventoryManager.TryGiveItemstack(giveStack, true);
             }
         }
 

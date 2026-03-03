@@ -18,8 +18,6 @@ namespace FirstStepsTweaks
         {
             var config = LoadConfig(api);
 
-            api.Event.DidUseBlock += DebugCommands.DebugBlock;
-
             discord = new DiscordBridge(api);
             joinService = new JoinService(api, config);
 
