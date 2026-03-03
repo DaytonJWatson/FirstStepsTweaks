@@ -31,6 +31,7 @@ namespace FirstStepsTweaks.Discord
         private int lastDayNumber;
         private string lastSeasonName;
         private bool? lastTemporalStormActive;
+        private bool temporalStormDetectionWarned;
 
         public DiscordBridge(ICoreServerAPI api)
         {
@@ -394,6 +395,15 @@ namespace FirstStepsTweaks.Discord
             if (TryGetNumericProperty(api.World, "TemporalStormStrength", out double worldStrength)) return worldStrength > 0;
             if (TryGetNumericProperty(api.World.Calendar, "TemporalStormStrength", out double calendarStrength)) return calendarStrength > 0;
 
+            if (TryFindTemporalStormState(api.World, 0, out bool discoveredState)) return discoveredState;
+            if (TryFindTemporalStormState(api.World?.Calendar, 0, out discoveredState)) return discoveredState;
+
+            if (!temporalStormDetectionWarned)
+            {
+                temporalStormDetectionWarned = true;
+                api.Logger.Warning("[FirstStepsTweaks] Unable to resolve temporal storm state from known API surfaces; storm relay messages are disabled until detectable state is found.");
+            }
+
             return null;
         }
 
@@ -426,6 +436,94 @@ namespace FirstStepsTweaks.Discord
 
             return false;
         }
+
+        private bool TryFindTemporalStormState(object instance, int depth, out bool value)
+        {
+            value = default;
+            if (instance == null || depth > 2) return false;
+
+            Type type = instance.GetType();
+            PropertyInfo[] properties;
+
+            try
+            {
+                properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            }
+            catch
+            {
+                return false;
+            }
+
+            foreach (PropertyInfo prop in properties)
+            {
+                if (!prop.CanRead) continue;
+
+                string propName = prop.Name ?? string.Empty;
+                string lowered = propName.ToLowerInvariant();
+                if (!lowered.Contains("storm") && !lowered.Contains("temporal")) continue;
+
+                object raw;
+                try
+                {
+                    raw = prop.GetValue(instance);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (raw == null) continue;
+
+                if (raw is bool boolValue)
+                {
+                    value = boolValue;
+                    return true;
+                }
+
+                if (raw is string stringValue)
+                {
+                    string normalized = stringValue.Trim().ToLowerInvariant();
+                    if (normalized == "active" || normalized == "started" || normalized == "running")
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (normalized == "inactive" || normalized == "ended" || normalized == "stopped")
+                    {
+                        value = false;
+                        return true;
+                    }
+                }
+
+                if (TryConvertToDouble(raw, out double numericValue))
+                {
+                    value = numericValue > 0;
+                    return true;
+                }
+
+                if (TryGetStormFlagFromNestedObject(raw, "TemporalStorm", out bool nestedStorm))
+                {
+                    value = nestedStorm;
+                    return true;
+                }
+
+                if (TryGetStormFlagFromNestedObject(raw, "Storm", out nestedStorm))
+                {
+                    value = nestedStorm;
+                    return true;
+                }
+
+                if (TryFindTemporalStormState(raw, depth + 1, out bool deepValue))
+                {
+                    value = deepValue;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
 
         private string SeasonNameFromMonth(int month, int monthsPerYear)
         {
@@ -460,6 +558,21 @@ namespace FirstStepsTweaks.Discord
             if (normalized < 0.5d) return "Summer";
             if (normalized < 0.75d) return "Autumn";
             return "Winter";
+        }
+
+        private bool TryConvertToDouble(object raw, out double value)
+        {
+            value = default;
+
+            try
+            {
+                value = Convert.ToDouble(raw);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private bool TryGetNumericProperty(object instance, string propertyName, out double value)
