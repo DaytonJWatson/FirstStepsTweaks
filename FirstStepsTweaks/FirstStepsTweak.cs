@@ -36,7 +36,7 @@ namespace FirstStepsTweaks
 
             if (config.Features.EnableJoinBroadcasts)
             {
-                api.Event.PlayerJoin += joinService.OnPlayerJoin;
+                api.Event.PlayerNowPlaying += joinService.OnPlayerJoin;
             }
 
             if (config.Features.EnableLandClaimNotifications)
