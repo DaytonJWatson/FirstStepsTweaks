@@ -19,6 +19,8 @@ namespace FirstStepsTweaks
         {
             var config = LoadConfig(api);
 
+            registerPrivileges(api);
+
             discord = new DiscordBridge(api);
             joinService = new JoinService(api, config);
             joinInvulnerabilityService = new JoinInvulnerabilityService(api);
@@ -60,6 +62,7 @@ namespace FirstStepsTweaks
             {
                 WhosOnlineCommand.Register(api, config);
                 WindCommand.Register(api, config);
+                AdminVitalsCommands.Register(api);
             }
             if (config.Features.EnableCorpseAdminCommands && corpseService != null)
             {
@@ -80,5 +83,27 @@ namespace FirstStepsTweaks
 
             return config;
         }
+
+        private void registerPrivileges(ICoreServerAPI api)
+        {
+            api.Permissions.RegisterPrivilege(
+                "firststepstweaks.back",
+                "Allows the player to use the /back command to return to their last location after death.",
+                true
+            );
+
+            api.Permissions.RegisterPrivilege(
+                "firststepstweaks.donatorkit",
+                "Allows the player to use the /kit donor command to receive a special donator kit.",
+                true
+            );
+
+            api.Permissions.RegisterPrivilege(
+                "firststepstweaks.graveadmin",
+                "Allows the player to use admin commands for managing corpse graves, such as listing, removing, and giving grave items.",
+                true
+            );
+        }
     }
 }
+

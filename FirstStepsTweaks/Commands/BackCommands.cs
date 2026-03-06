@@ -23,7 +23,7 @@ namespace FirstStepsTweaks.Commands
                 .Create("back")
                 .WithDescription("Teleport back to your last location")
                 .RequiresPlayer()
-                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPrivilege("firststepstweaks.back")
                 .HandleWith(args => Back(api, args));
         }
 

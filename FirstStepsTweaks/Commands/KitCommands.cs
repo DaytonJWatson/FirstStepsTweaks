@@ -10,6 +10,7 @@ namespace FirstStepsTweaks.Commands
     {
         private const string StarterKey = "fst_starterclaimed";
         private const string WinterKey = "fst_winterclaimed";
+        private const string DonatorKey = "fst_donatorclaimed";
         private static KitConfig kitConfig = new KitConfig();
 
         public static void Register(ICoreServerAPI api, FirstStepsTweaksConfig config)
@@ -34,6 +35,16 @@ namespace FirstStepsTweaks.Commands
                     .RequiresPlayer()
                     .RequiresPrivilege(Privilege.chat)
                     .HandleWith(args => WinterKit(api, args));
+            }
+
+            if (kitConfig.EnableDonatorKit)
+            {
+                api.ChatCommands
+                    .Create("donatorkit")
+                    .WithDescription("Gives donator thank-you kit")
+                    .RequiresPlayer()
+                    .RequiresPrivilege("firststepstweaks.donatorkit")
+                    .HandleWith(args => DonatorKit(api, args));
             }
         }
 
@@ -73,6 +84,25 @@ namespace FirstStepsTweaks.Commands
             player.SendMessage(GlobalConstants.InfoLogChatGroup, "You have received your winter kit!", EnumChatType.CommandSuccess);
             player.SendMessage(GlobalConstants.GeneralChatGroup, "You have received your winter kit!", EnumChatType.Notification);
 
+            return TextCommandResult.Success();
+        }
+
+        private static TextCommandResult DonatorKit(ICoreServerAPI api, TextCommandCallingArgs args)
+        {
+            IServerPlayer player = (IServerPlayer)args.Caller.Player;
+
+            if (player.GetModdata(DonatorKey) != null)
+            {
+                player.SendMessage(GlobalConstants.InfoLogChatGroup, "You have already claimed your donator kit.", EnumChatType.CommandError);
+                player.SendMessage(GlobalConstants.GeneralChatGroup, "You have already claimed your donator kit.", EnumChatType.Notification);
+
+                return TextCommandResult.Success();
+            }
+
+            GiveConfiguredItems(api, player, kitConfig.DonatorItems);
+            player.SetModdata(DonatorKey, new byte[] { 1 });
+            player.SendMessage(GlobalConstants.InfoLogChatGroup, "You have received your donator kit!", EnumChatType.CommandSuccess);
+            player.SendMessage(GlobalConstants.GeneralChatGroup, "You have received your donator kit!", EnumChatType.Notification);
 
             return TextCommandResult.Success();
         }

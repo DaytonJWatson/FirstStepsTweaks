@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>FirstStepsTweaks</RootNamespace>
@@ -21,8 +21,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <Target Name="PostBuild" AfterTargets="Build">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)scripts\PackModZip.ps1&quot; -DllPath &quot;$(TargetPath)&quot; -ProjectDir &quot;$(MSBuildProjectDirectory)&quot; -OutputZip &quot;C:\Users\daytonwatson\AppData\Roaming\VSserverData\Mods\FirstStepsTweaks.zip&quot;" />
-  </Target>
+  <ItemGroup>
+    <Folder Include="Assets\firststepstweaks\itemtypes\" />
+  </ItemGroup>
+	<Target Name="PostBuild" AfterTargets="Build">
+		<Exec Command="set ModName=FirstStepsTweaks&#xD;&#xA;set ModsFolder=C:\Users\daytonwatson\AppData\Roaming\VSserverData\Mods&#xD;&#xA;&#xD;&#xA;if exist &quot;%25ModsFolder%25\%25ModName%25.zip&quot; del &quot;%25ModsFolder%25\%25ModName%25.zip&quot;&#xD;&#xA;&#xD;&#xA;powershell -NoProfile -ExecutionPolicy Bypass -Command ^&#xD;&#xA;&quot;Compress-Archive -LiteralPath '$(TargetPath)','$(ProjectDir)modinfo.json','$(ProjectDir)assets' -DestinationPath '%25ModsFolder%25\%25ModName%25.zip' -Force&quot;" />
+	</Target>
 </Project>
 

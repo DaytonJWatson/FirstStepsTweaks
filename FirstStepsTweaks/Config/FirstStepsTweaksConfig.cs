@@ -66,6 +66,7 @@ namespace FirstStepsTweaks.Config
     {
         public bool EnableStarterKit { get; set; } = true;
         public bool EnableWinterKit { get; set; } = true;
+        public bool EnableDonatorKit { get; set; } = true;
         public List<KitItemConfig> StarterItems { get; set; } = new List<KitItemConfig>
         {
             new KitItemConfig("game:flint", 6),
@@ -82,6 +83,13 @@ namespace FirstStepsTweaks.Config
             new KitItemConfig("game:clothes-foot-knee-high-fur-boots", 1),
             new KitItemConfig("game:clothes-hand-fur-gloves", 1),
             new KitItemConfig("game:redmeat-cooked", 12)
+        };
+
+        public List<KitItemConfig> DonatorItems { get; set; } = new List<KitItemConfig>
+        {
+            new KitItemConfig("game:statictranslocator-broken-north", 1),
+            new KitItemConfig("game:gear-temporal", 1),
+            new KitItemConfig("firststepstweaks:donator-spear", 2)
         };
     }
 
@@ -119,7 +127,7 @@ namespace FirstStepsTweaks.Config
     public class LandClaimNotificationConfig
     {
         public int TickIntervalMs { get; set; } = 1000;
-        public string EnterMessage { get; set; } = "You entered {owner} land claim.";
-        public string ExitMessage { get; set; } = "You left {owner} land claim.";
+        public string EnterMessage { get; set; } = "You entered {owner} land claim. ({claim})";
+        public string ExitMessage { get; set; } = "You left {owner} land claim. ({claim})";
     }
 }

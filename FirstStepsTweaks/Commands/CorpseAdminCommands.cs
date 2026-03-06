@@ -14,7 +14,7 @@ namespace FirstStepsTweaks.Commands
             api.ChatCommands.Create("graveadmin")
                 .WithDescription("Admin tools for corpse graves")
                 .RequiresPlayer()
-                .RequiresPrivilege(Privilege.controlserver)
+                .RequiresPrivilege("firststepstweaks.graveadmin")
                 .BeginSubCommand("list")
                     .WithDescription("List active graves")
                     .HandleWith(args => ListActiveGraves(args, corpseService))
