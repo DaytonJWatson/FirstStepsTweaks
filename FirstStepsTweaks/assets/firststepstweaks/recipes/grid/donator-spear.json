@@ -1,0 +1,21 @@
+{
+  "type": "grid",
+  "width": 3,
+  "height": 3,
+  "ingredientPattern": "FFF,_S_,___",
+  "ingredients": {
+    "F": {
+      "type": "item",
+      "code": "game:spearhead-flint"
+    },
+    "S": {
+      "type": "item",
+      "code": "game:stick"
+    }
+  },
+  "output": {
+    "type": "item",
+    "code": "firststepstweaks:donator-spear",
+    "quantity": 1
+  }
+}

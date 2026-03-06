@@ -89,7 +89,7 @@ namespace FirstStepsTweaks.Config
         {
             new KitItemConfig("game:statictranslocator-broken-north", 1),
             new KitItemConfig("game:gear-temporal", 1),
-            new KitItemConfig("firststepstweaks:donator-spear", 2)
+            new KitItemConfig("game:gear-temporal", 1)
         };
     }
 

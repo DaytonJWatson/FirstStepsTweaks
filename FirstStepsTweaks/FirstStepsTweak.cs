@@ -9,6 +9,8 @@ namespace FirstStepsTweaks
 {
     public class FirstStepsTweaks : ModSystem
     {
+        private static readonly AssetLocation DonatorSpearCode = new AssetLocation("firststepstweaks", "donator-spear");
+
         private DiscordBridge discord;
         private JoinService joinService;
         private JoinInvulnerabilityService joinInvulnerabilityService;
@@ -49,6 +51,7 @@ namespace FirstStepsTweaks
             }
 
             api.Event.PlayerChat += discord.OnPlayerChat;
+            api.Event.MatchesGridRecipe += OnMatchesGridRecipe;
 
             if (config.Features.EnableDebugCommand) DebugCommands.Register(api);
             if (config.Features.EnableDiscordCommand) DiscordCommands.Register(api, config);
@@ -99,11 +102,28 @@ namespace FirstStepsTweaks
             );
 
             api.Permissions.RegisterPrivilege(
+                "firststepstweaks.donator",
+                "Allows the player to craft donator-only items like the donator spear special recipe.",
+                true
+            );
+
+            api.Permissions.RegisterPrivilege(
                 "firststepstweaks.graveadmin",
                 "Allows the player to use admin commands for managing corpse graves, such as listing, removing, and giving grave items.",
                 true
             );
         }
+
+
+        // this handles the donator spear only being craftable by donators
+        private bool OnMatchesGridRecipe(IPlayer player, GridRecipe recipe, ItemSlot[] ingredients, int gridWidth)
+        {
+            if (recipe?.Output?.Code == null || !recipe.Output.Code.Equals(DonatorSpearCode))
+            {
+                return true;
+            }
+
+            return player?.HasPrivilege("firststepstweaks.donator") == true;
+        }
     }
 }
-

@@ -5,13 +5,13 @@
   "tags": ["weapon", "weapon-melee"],
   "damagedby": ["attacking"],
 
-  "durability": 1200,
-  "attackpower": 4.6,
-  "damage": 10,
+  "durability": 300,
+  "AttackPower": 4.6,
+  "Damage": 10,
   "attackspeed": 1.1,
   "attackRange": 4.0,
-  "tool": "spear",
-  "damagetier": 3,
+  "Tool": "Spear",
+  "ToolTier": 3,
 
   "shape": {
     "base": "game:item/tool/spear/ruined/voulge"
@@ -20,8 +20,18 @@
   "heldTpIdleAnimation": "spearidle",
   "heldRightReadyAnimation": "spearidle",
   "heldTpHitAnimation": "spearhit",
+  "behaviors": [
+    {
+      "name": "GroundStorable",
+      "properties": {
+        "layout": "WallHalves",
+        "wallOffY": 2,
+        "sprintKey": true
+      }
+    }
+  ],
 
-  "guiTransform": {
+  "GuiTransform": {
     "translation": { "x": 0, "y": 0, "z": 0 },
     "rotation": { "x": -180, "y": 128, "z": 38 },
     "origin": { "x": 1.29, "y": 0, "z": 0.5 },
@@ -39,24 +49,24 @@
     "origin": { "x": 0.5, "y": 0, "z": 0.5 },
     "scale": 0.8
   },
-  "groundTransform": {
-    "translation": { "x": 0, "y": 0.05, "z": 0 },
-    "rotation": { "x": 68, "y": 0, "z": 0 },
+  "GroundTransform": {
+    "translation": { "x": 0, "y": 0.05, "z": -0.22 },
+    "rotation": { "x": 0, "y": 0, "z": 90 },
     "origin": { "x": 0.5, "y": 0, "z": 0.5 },
     "scale": 3.4
   },
 
+  "toolrackTransform": "Sword",
+
   "attributes": {
     "heldItemPitchFollow": 1,
-    "damage": 8,
-    "damageTier": 0,
+    "damage": 10,
+    "damageTier": 3,
     "spearEntityCode": "spear-voulge-ruined",
     "spearEntityCodeByType": {
       "*": "spear-voulge-ruined"
     },
-    "handbook": {
-      "category": "weapon"
-    },
+    
     "lore": [
       "A relic gifted to loyal supporters.",
       "The metal is scarred but battle-ready."
