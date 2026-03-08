@@ -21,11 +21,8 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Assets\firststepstweaks\itemtypes\" />
-  </ItemGroup>
 	<Target Name="PostBuild" AfterTargets="Build">
-		<Exec Command="set ModName=FirstStepsTweaks&#xD;&#xA;set ModsFolder=C:\Users\daytonwatson\AppData\Roaming\VSserverData\Mods&#xD;&#xA;&#xD;&#xA;if exist &quot;%25ModsFolder%25\%25ModName%25.zip&quot; del &quot;%25ModsFolder%25\%25ModName%25.zip&quot;&#xD;&#xA;&#xD;&#xA;powershell -NoProfile -ExecutionPolicy Bypass -Command ^&#xD;&#xA;&quot;Compress-Archive -LiteralPath '$(TargetPath)','$(ProjectDir)modinfo.json','$(ProjectDir)assets' -DestinationPath '%25ModsFolder%25\%25ModName%25.zip' -Force&quot;" />
+		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\CreateModZip.ps1&quot; -ProjectDir &quot;$(MSBuildProjectDirectory)&quot; -TargetPath &quot;$(TargetPath)&quot; -ModName &quot;FirstStepsTweaks&quot; -ModsFolder &quot;C:\Users\daytonwatson\AppData\Roaming\VSserverData\Mods&quot;" />
 	</Target>
 </Project>
 

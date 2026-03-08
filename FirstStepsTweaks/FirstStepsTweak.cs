@@ -14,7 +14,6 @@ namespace FirstStepsTweaks
         private DiscordBridge discord;
         private JoinService joinService;
         private JoinInvulnerabilityService joinInvulnerabilityService;
-        private CorpseService corpseService;
         private LandClaimNotificationService landClaimNotificationService;
 
         public override void StartServerSide(ICoreServerAPI api)
@@ -27,13 +26,6 @@ namespace FirstStepsTweaks
             joinService = new JoinService(api, config);
             joinInvulnerabilityService = new JoinInvulnerabilityService(api);
 
-            if (config.Features.EnableCorpseService)
-            {
-                corpseService = new CorpseService(api, config);
-                api.Event.OnEntityDeath += corpseService.OnEntityDeath;
-                api.Event.DidBreakBlock += corpseService.OnBlockBroken;
-            }
-
             if (config.Features.EnableBackCommand)
             {
                 api.Event.OnEntityDeath += BackCommands.OnEntityDeath;
@@ -44,6 +36,7 @@ namespace FirstStepsTweaks
             api.Event.PlayerNowPlaying += joinInvulnerabilityService.OnPlayerNowPlaying;
             api.Event.PlayerNowPlaying += joinService.OnPlayerNowPlaying;
             api.Event.PlayerLeave += joinInvulnerabilityService.OnPlayerLeave;
+            api.Event.PlayerLeave += joinService.OnPlayerLeave;
 
             if (config.Features.EnableLandClaimNotifications)
             {
@@ -66,10 +59,6 @@ namespace FirstStepsTweaks
                 WhosOnlineCommand.Register(api, config);
                 WindCommand.Register(api, config);
                 AdminVitalsCommands.Register(api);
-            }
-            if (config.Features.EnableCorpseAdminCommands && corpseService != null)
-            {
-                CorpseAdminCommands.Register(api, corpseService);
             }
         }
 
@@ -109,7 +98,12 @@ namespace FirstStepsTweaks
 
             api.Permissions.RegisterPrivilege(
                 "firststepstweaks.graveadmin",
-                "Allows the player to use admin commands for managing corpse graves, such as listing, removing, and giving grave items.",
+                "Allows the player to use admin commands for managing gravestones, such as listing, removing, and giving grave items.",
+                true
+            );
+            api.Permissions.RegisterPrivilege(
+                TeleportBypass.Privilege,
+                "Allows the player to bypass teleport cooldown timers (for example, /rtp cooldown).",
                 true
             );
         }
@@ -127,3 +121,5 @@ namespace FirstStepsTweaks
         }
     }
 }
+
+

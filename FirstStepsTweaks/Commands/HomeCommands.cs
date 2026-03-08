@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using FirstStepsTweaks.Config;
+using FirstStepsTweaks.Services;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -78,6 +79,7 @@ namespace FirstStepsTweaks.Commands
 
             return TextCommandResult.Success();
         }
+
         private static TextCommandResult Home(ICoreServerAPI api, TextCommandCallingArgs args)
         {
             IServerPlayer player = args.Caller.Player as IServerPlayer;
@@ -103,6 +105,15 @@ namespace FirstStepsTweaks.Commands
             double targetX = BitConverter.ToDouble(data, 0);
             double targetY = BitConverter.ToDouble(data, 8);
             double targetZ = BitConverter.ToDouble(data, 16);
+
+            if (teleportConfig.WarmupSeconds > 0 && TeleportBypass.HasBypass(player))
+            {
+                TeleportBypass.NotifyBypassingCooldown(player, "/home warmup");
+                BackCommands.RecordCurrentLocation(player);
+                player.Entity.TeleportToDouble(targetX, targetY, targetZ);
+                player.SendIngameError("no_permission", "Teleported home.");
+                return TextCommandResult.Success();
+            }
 
             double startX = player.Entity.Pos.X;
             double startY = player.Entity.Pos.Y;

@@ -1,5 +1,6 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using FirstStepsTweaks.Config;
+using FirstStepsTweaks.Services;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
@@ -71,6 +72,20 @@ namespace FirstStepsTweaks.Commands
                     "No previous location recorded.",
                     EnumChatType.Notification
                 );
+                return TextCommandResult.Success();
+            }
+
+            if (teleportConfig.WarmupSeconds > 0 && TeleportBypass.HasBypass(player))
+            {
+                TeleportBypass.NotifyBypassingCooldown(player, "/back warmup");
+
+                Vec3d currentLocation =
+                    new Vec3d(player.Entity.Pos.X, player.Entity.Pos.Y, player.Entity.Pos.Z);
+
+                player.Entity.TeleportToDouble(lastLocation.X, lastLocation.Y, lastLocation.Z);
+                LastPositionsByPlayerUid[player.PlayerUID] = currentLocation;
+
+                player.SendIngameError("no_permission", "Teleported to your last location.");
                 return TextCommandResult.Success();
             }
 

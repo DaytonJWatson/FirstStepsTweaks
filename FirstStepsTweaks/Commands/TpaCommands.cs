@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using FirstStepsTweaks.Config;
+using FirstStepsTweaks.Services;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -223,6 +224,20 @@ namespace FirstStepsTweaks.Commands
 
         private static void StartTeleportWarmup(ICoreServerAPI api, IServerPlayer requester, IServerPlayer target)
         {
+            if (teleportConfig.WarmupSeconds > 0 && TeleportBypass.HasBypass(requester))
+            {
+                TeleportBypass.NotifyBypassingCooldown(requester, "/tpa warmup");
+                BackCommands.RecordCurrentLocation(requester);
+                requester.Entity.TeleportToDouble(
+                    target.Entity.Pos.X,
+                    target.Entity.Pos.Y,
+                    target.Entity.Pos.Z
+                );
+
+                requester.SendIngameError("no_permission", "Teleported.");
+                return;
+            }
+
             double startX = requester.Entity.Pos.X;
             double startY = requester.Entity.Pos.Y;
             double startZ = requester.Entity.Pos.Z;

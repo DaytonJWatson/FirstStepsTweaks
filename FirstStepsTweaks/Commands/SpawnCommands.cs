@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using FirstStepsTweaks.Config;
+using FirstStepsTweaks.Services;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.Server;
@@ -86,6 +87,15 @@ namespace FirstStepsTweaks.Commands
             double targetX = spawnData[0];
             double targetY = spawnData[1];
             double targetZ = spawnData[2];
+
+            if (teleportConfig.WarmupSeconds > 0 && TeleportBypass.HasBypass(player))
+            {
+                TeleportBypass.NotifyBypassingCooldown(player, "/spawn warmup");
+                BackCommands.RecordCurrentLocation(player);
+                player.Entity.TeleportToDouble(targetX, targetY, targetZ);
+                player.SendIngameError("no_permission", "Teleported to spawn.");
+                return TextCommandResult.Success();
+            }
 
             double startX = player.Entity.Pos.X;
             double startY = player.Entity.Pos.Y;

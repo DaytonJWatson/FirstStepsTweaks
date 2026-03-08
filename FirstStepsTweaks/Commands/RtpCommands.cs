@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using FirstStepsTweaks.Config;
+using FirstStepsTweaks.Services;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
@@ -38,6 +39,7 @@ namespace FirstStepsTweaks.Commands
         {
             var player = (IServerPlayer)args.Caller.Player;
             long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            bool hasBypassCooldown = TeleportBypass.HasBypass(player);
 
             if (rtpConfig.CooldownSeconds > 0 && LastRtpByPlayerUid.TryGetValue(player.PlayerUID, out long lastRtpMs))
             {
@@ -45,18 +47,25 @@ namespace FirstStepsTweaks.Commands
                 if (remainingMs > 0)
                 {
                     int remainingSeconds = (int)Math.Ceiling(remainingMs / 1000d);
-                    player.SendMessage(
-                        GlobalConstants.InfoLogChatGroup,
-                        $"You must wait {remainingSeconds}s before using /rtp again.",
-                        EnumChatType.CommandError
-                        );
+                    if (hasBypassCooldown)
+                    {
+                        TeleportBypass.NotifyBypassingCooldown(player, $"/rtp wait {remainingSeconds}s");
+                    }
+                    else
+                    {
+                        player.SendMessage(
+                            GlobalConstants.InfoLogChatGroup,
+                            $"You must wait {remainingSeconds}s before using /rtp again.",
+                            EnumChatType.CommandError
+                            );
 
-                    player.SendMessage(
-                        GlobalConstants.GeneralChatGroup,
-                        $"You must wait {remainingSeconds}s before using /rtp again.",
-                        EnumChatType.Notification
-                        );
-                    return TextCommandResult.Success();
+                        player.SendMessage(
+                            GlobalConstants.GeneralChatGroup,
+                            $"You must wait {remainingSeconds}s before using /rtp again.",
+                            EnumChatType.Notification
+                            );
+                        return TextCommandResult.Success();
+                    }
                 }
             }
 
@@ -77,12 +86,17 @@ namespace FirstStepsTweaks.Commands
                 return TextCommandResult.Success();
             }
 
-            if (rtpConfig.UseWarmup && teleportConfig.WarmupSeconds > 0)
+            if (rtpConfig.UseWarmup && teleportConfig.WarmupSeconds > 0 && !hasBypassCooldown)
             {
                 StartWarmupTeleport(api, player, destination);
             }
             else
             {
+                if (rtpConfig.UseWarmup && teleportConfig.WarmupSeconds > 0 && hasBypassCooldown)
+                {
+                    TeleportBypass.NotifyBypassingCooldown(player, "/rtp warmup");
+                }
+
                 BackCommands.RecordCurrentLocation(player);
                 player.Entity.TeleportToDouble(destination.X, destination.Y, destination.Z);
                 player.SendMessage(

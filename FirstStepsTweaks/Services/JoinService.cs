@@ -49,7 +49,13 @@ namespace FirstStepsTweaks.Services
                     EnumChatType.AllGroups
                 );
             }
+        }
 
+        public void OnPlayerLeave(IServerPlayer player)
+        {
+            if (player == null) return;
+
+            double currentTotalDays = api.World.Calendar.TotalDays;
             player.SetModdata(LastSeenDayKey, BitConverter.GetBytes(currentTotalDays));
         }
 
@@ -69,3 +75,4 @@ namespace FirstStepsTweaks.Services
         }
     }
 }
+
