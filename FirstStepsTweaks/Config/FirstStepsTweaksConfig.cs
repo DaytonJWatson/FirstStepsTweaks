@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace FirstStepsTweaks.Config
 {
@@ -122,6 +122,8 @@ namespace FirstStepsTweaks.Config
         public int DropCleanupTickMs { get; set; } = 50;
         public int EnforceGraveTickMs { get; set; } = 200;
         public long GraveExpireMs { get; set; } = 3600000;
+        public int GraveCleanupTickMs { get; set; } = 60000;
+        public double GraveCleanupInGameDays { get; set; } = 30;
     }
 
     public class LandClaimNotificationConfig
@@ -131,3 +133,4 @@ namespace FirstStepsTweaks.Config
         public string ExitMessage { get; set; } = "You left {owner} land claim. ({claim})";
     }
 }
+

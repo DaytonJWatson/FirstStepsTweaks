@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>FirstStepsTweaks</RootNamespace>
@@ -6,23 +6,49 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>AnyCPU</Platforms>
     <PlatformTarget>AnyCPU</PlatformTarget>
+
+    <!-- Allow cross-platform builds to supply the API reference path. -->
+    <VintagestoryApiPath Condition="'$(VintagestoryApiPath)' == '' and '$(VINTAGESTORY_API_PATH)' != ''">$(VINTAGESTORY_API_PATH)</VintagestoryApiPath>
+    <VintagestoryApiPath Condition="'$(VintagestoryApiPath)' == '' and Exists('$(MSBuildProjectDirectory)/lib/VintagestoryAPI.dll')">$(MSBuildProjectDirectory)/lib/VintagestoryAPI.dll</VintagestoryApiPath>
+    <VintagestoryApiPath Condition="'$(VintagestoryApiPath)' == '' and Exists('C:\Users\daytonwatson\Desktop\VintagestoryAPI.dll')">C:\Users\daytonwatson\Desktop\VintagestoryAPI.dll</VintagestoryApiPath>
+
+    <!-- Package ZIP by default on Windows only; non-Windows can opt in via -p:EnableModZipPackaging=true. -->
+    <EnableModZipPackaging Condition="'$(EnableModZipPackaging)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">true</EnableModZipPackaging>
+    <EnableModZipPackaging Condition="'$(EnableModZipPackaging)' == '' and !$([MSBuild]::IsOSPlatform('Windows'))">false</EnableModZipPackaging>
+
+    <ModsFolder Condition="'$(ModsFolder)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">$(APPDATA)/VSserverData/Mods</ModsFolder>
+    <ModsFolder Condition="'$(ModsFolder)' == '' and !$([MSBuild]::IsOSPlatform('Windows'))">$(HOME)/.config/VSserverData/Mods</ModsFolder>
   </PropertyGroup>
+
   <ItemGroup>
     <Reference Include="VintagestoryAPI">
-      <HintPath>C:\Users\daytonwatson\Desktop\VintagestoryAPI.dll</HintPath>
+      <HintPath>$(VintagestoryApiPath)</HintPath>
+      <Private>false</Private>
     </Reference>
   </ItemGroup>
+
   <ItemGroup>
     <None Update="modinfo.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>modinfo.json</TargetPath>
     </None>
-    <None Update="assets\**\*">
+    <None Update="assets/**/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-	<Target Name="PostBuild" AfterTargets="Build">
-		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\CreateModZip.ps1&quot; -ProjectDir &quot;$(MSBuildProjectDirectory)&quot; -TargetPath &quot;$(TargetPath)&quot; -ModName &quot;FirstStepsTweaks&quot; -ModsFolder &quot;C:\Users\daytonwatson\AppData\Roaming\VSserverData\Mods&quot;" />
-	</Target>
-</Project>
 
+  <Target Name="ValidateVintagestoryApiReference" BeforeTargets="ResolveReferences">
+    <Error
+      Condition="'$(VintagestoryApiPath)' == '' or !Exists('$(VintagestoryApiPath)')"
+      Text="VintagestoryAPI.dll not found. Set -p:VintagestoryApiPath=... or VINTAGESTORY_API_PATH to the API DLL location." />
+  </Target>
+
+  <Target Name="PostBuild" AfterTargets="Build" Condition="'$(EnableModZipPackaging)' == 'true'">
+    <Exec
+      Condition="$([MSBuild]::IsOSPlatform('Windows'))"
+      Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/scripts/CreateModZip.ps1&quot; -ProjectDir &quot;$(MSBuildProjectDirectory)&quot; -TargetPath &quot;$(TargetPath)&quot; -ModName &quot;FirstStepsTweaks&quot; -ModsFolder &quot;$(ModsFolder)&quot;" />
+    <Exec
+      Condition="!$([MSBuild]::IsOSPlatform('Windows'))"
+      Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)/scripts/CreateModZip.ps1&quot; -ProjectDir &quot;$(MSBuildProjectDirectory)&quot; -TargetPath &quot;$(TargetPath)&quot; -ModName &quot;FirstStepsTweaks&quot; -ModsFolder &quot;$(ModsFolder)&quot;" />
+  </Target>
+</Project>

@@ -15,7 +15,7 @@ namespace FirstStepsTweaks
         private JoinService joinService;
         private JoinInvulnerabilityService joinInvulnerabilityService;
         private LandClaimNotificationService landClaimNotificationService;
-
+        private GravestoneService gravestoneService;
         public override void StartServerSide(ICoreServerAPI api)
         {
             var config = LoadConfig(api);
@@ -30,6 +30,16 @@ namespace FirstStepsTweaks
             {
                 api.Event.OnEntityDeath += BackCommands.OnEntityDeath;
                 BackCommands.Register(api, config);
+            }
+
+            if (config.Features.EnableCorpseService)
+            {
+                gravestoneService = new GravestoneService(api, config);
+
+                if (config.Features.EnableCorpseAdminCommands)
+                {
+                    GravestoneCommands.Register(api, gravestoneService);
+                }
             }
 
             api.Event.PlayerJoin += joinInvulnerabilityService.OnPlayerJoin;
@@ -121,5 +131,10 @@ namespace FirstStepsTweaks
         }
     }
 }
+
+
+
+
+
 
 
